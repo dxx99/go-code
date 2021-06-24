@@ -36,11 +36,15 @@
     - Mutex和RWMutex
     - Cond
     - Once
-    - Pool
+    - Pool (???)
 
 - channels
 
 - select
+  - 取消
+  - 超时
+  - 等待
+  - 默认值
 
 - GOMAXPROCS
 
