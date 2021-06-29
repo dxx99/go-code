@@ -19,9 +19,6 @@ var doWork = func(str <-chan string) <-chan interface{} {
 	return completed
 }
 
-
-
-
 // 访问 http://127.0.0.1:6060/debug/pprof
 // go内存泄露的简单例子
 func main() {

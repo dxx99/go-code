@@ -8,7 +8,7 @@ import (
 
 // boring is a func that return a channel to communicate with it.
 // <-chan string means receives-only channel of string
-func boring(msg string) <- chan string{
+func boring(msg string) <-chan string {
 	ch := make(chan string)
 
 	// we launch(启动) goroutine inside a func

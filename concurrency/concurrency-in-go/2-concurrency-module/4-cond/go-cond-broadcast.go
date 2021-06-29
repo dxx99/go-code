@@ -40,7 +40,7 @@ func main() {
 		fmt.Println("Mouse clicked.")
 	})
 
-	button.Clicked.Broadcast()	//唤醒因为条件阻塞的goroutine
+	button.Clicked.Broadcast() //唤醒因为条件阻塞的goroutine
 	waitG.Wait()
 
 }

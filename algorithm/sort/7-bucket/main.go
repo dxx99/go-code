@@ -34,15 +34,15 @@ func bucketSort(nums []int, bucketSize int) []int {
 			minValue = item
 		}
 	}
-	bucketCount := (maxValue - minValue)/bucketSize + 1
+	bucketCount := (maxValue-minValue)/bucketSize + 1
 	fmt.Printf("bucketCount = %d\n", bucketCount)
 	bucketList := make([][]int, bucketCount)
 
 	// 数据插入到bucket中
 	for _, item := range nums {
-		tmpArr := bucketList[(item - minValue)/bucketSize]
+		tmpArr := bucketList[(item-minValue)/bucketSize]
 		if len(tmpArr) == 0 {
-			bucketList[(item - minValue)/bucketSize] = append(tmpArr, item)
+			bucketList[(item-minValue)/bucketSize] = append(tmpArr, item)
 			continue
 		}
 
@@ -57,7 +57,7 @@ func bucketSort(nums []int, bucketSize int) []int {
 				continue
 			}
 		}
-		bucketList[(item - minValue)/bucketSize] = newSlice
+		bucketList[(item-minValue)/bucketSize] = newSlice
 
 	}
 

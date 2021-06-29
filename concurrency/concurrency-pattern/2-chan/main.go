@@ -6,12 +6,13 @@ import (
 	"time"
 )
 
-func boring(msg string, ch chan string)  {
+func boring(msg string, ch chan string) {
 	for i := 0; ; i++ {
 		ch <- fmt.Sprintf("%s --> %d", msg, i)
 		time.Sleep(time.Duration(rand.Intn(1e3)) * time.Millisecond)
 	}
 }
+
 // code source:
 // https://talks.golang.org/2012/concurrency.slide#20
 func main() {

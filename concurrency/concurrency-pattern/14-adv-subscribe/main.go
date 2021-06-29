@@ -6,19 +6,18 @@ import "time"
 
 // Item a subset(子集) of Rss fields
 type Item struct {
-	Title string
+	Title   string
 	Channel string
-	Guid string
+	Guid    string
 }
 
 type Fetcher interface {
 	Fetch() (items []Item, next time.Time, err error)
 }
 
-
 type Subscription interface {
-	Updates() <-chan Item	// stream of Items
-	Close() error	// shuts down the stream
+	Updates() <-chan Item // stream of Items
+	Close() error         // shuts down the stream
 }
 
 func Subscribe(fetcher Fetcher) Subscription {

@@ -52,14 +52,13 @@ func fanSimple(chs ...<-chan string) <-chan string {
 	ch := make(chan string)
 
 	for _, chi := range chs {
-		go func(chi <- chan string) {
+		go func(chi <-chan string) {
 			ch <- <-chi
 		}(chi)
 	}
 
 	return ch
 }
-
 
 // code source:
 // https://talks.golang.org/2012/concurrency.slide#27

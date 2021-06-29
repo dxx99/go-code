@@ -38,8 +38,7 @@ func main() {
 		return valueStream
 	}
 
-
-	toInt := func(done <-chan interface{}, valueStream <-chan interface{}, ) <-chan int {
+	toInt := func(done <-chan interface{}, valueStream <-chan interface{}) <-chan int {
 		intStream := make(chan int)
 		go func() {
 			defer close(intStream)

@@ -7,7 +7,7 @@ import (
 )
 
 //go:generate go test -bench=. -benchtime=10s
-func BenchmarkNetworkNoPoolRequest(b *testing.B)  {
+func BenchmarkNetworkNoPoolRequest(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		conn, err := net.Dial("tcp", "localhost:8011")
 		if err != nil {
@@ -20,7 +20,3 @@ func BenchmarkNetworkNoPoolRequest(b *testing.B)  {
 		conn.Close()
 	}
 }
-
-
-
-

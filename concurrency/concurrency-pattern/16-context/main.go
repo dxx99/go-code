@@ -32,7 +32,7 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		sleepAndTalk(ctx, 5 * time.Second, "hello")
+		sleepAndTalk(ctx, 5*time.Second, "hello")
 	}()
 	wg.Wait()
 }

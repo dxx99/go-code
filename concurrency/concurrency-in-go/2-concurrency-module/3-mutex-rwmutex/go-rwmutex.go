@@ -46,6 +46,6 @@ func main() {
 	_, _ = fmt.Fprintf(tw, "Readers\tRWMutex\tMutex\n")
 	for i := 0; i < 20; i++ {
 		count := int(math.Pow(2, float64(i)))
-		_, _ = fmt.Fprintf(tw, "%d\t%v\t%v\n",count, test(count, &m, m.RLocker()), test(count, &m, &m))
+		_, _ = fmt.Fprintf(tw, "%d\t%v\t%v\n", count, test(count, &m, m.RLocker()), test(count, &m, &m))
 	}
 }

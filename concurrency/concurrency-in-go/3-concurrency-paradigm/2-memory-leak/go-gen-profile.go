@@ -11,7 +11,6 @@ import (
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 
-
 // 生成prof文件：
 //go:generate go run go-gen-profile.go --cpuprofile=cpu.prof
 
@@ -31,7 +30,7 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	 doWork := func(str <-chan string) <-chan interface{} {
+	doWork := func(str <-chan string) <-chan interface{} {
 		completed := make(chan interface{})
 		go func() {
 			defer fmt.Println("doWork exited")

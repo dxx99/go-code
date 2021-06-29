@@ -23,7 +23,7 @@ func selectSort(nums []int) []int {
 	for i := 0; i < l; i++ {
 		//core: 标记未排序元素的索引位置，最后方便用来做元素交换
 		minIndex := i
-		for j := i+1; j < l; j++ {
+		for j := i + 1; j < l; j++ {
 			if nums[j] < nums[minIndex] {
 				minIndex = j
 			}

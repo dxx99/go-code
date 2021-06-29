@@ -8,13 +8,12 @@ import (
 	"time"
 )
 
-
 // 生成链接池对象，并给10个初值
 func poolServerConnectCache() *sync.Pool {
 	p := &sync.Pool{
 		New: func() interface{} {
 			time.Sleep(200 * time.Millisecond)
-			return struct {}{}
+			return struct{}{}
 		},
 	}
 	for i := 0; i < 100; i++ {
@@ -23,7 +22,7 @@ func poolServerConnectCache() *sync.Pool {
 	return p
 }
 
-func main()  {
+func main() {
 	serv, err := net.Listen("tcp", "localhost:8022")
 	if err != nil {
 		log.Fatalf("Cannot listen: %v\n", err)

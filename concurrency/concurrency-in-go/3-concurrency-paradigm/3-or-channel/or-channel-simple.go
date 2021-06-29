@@ -14,7 +14,7 @@ func main() {
 				select {
 				case <-ch:
 					close(done)
-				case <-done:	//防止协程泄露
+				case <-done: //防止协程泄露
 					fmt.Printf("协程退出， %v\n", item)
 					return
 				}
@@ -36,5 +36,5 @@ func main() {
 	<-orChannel(timeWork(1*time.Hour), timeWork(3*time.Minute), timeWork(2*time.Second), timeWork(3*time.Hour))
 	fmt.Printf("work time after %v\n", time.Since(startTime))
 
-	time.Sleep(1*time.Second)
+	time.Sleep(1 * time.Second)
 }

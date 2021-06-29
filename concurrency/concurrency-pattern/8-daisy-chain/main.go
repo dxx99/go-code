@@ -5,7 +5,7 @@ import (
 )
 
 // f is right channel add one send left channel
-func f(left, right chan int)  {
+func f(left, right chan int) {
 	left <- 1 + <-right
 }
 
@@ -39,4 +39,3 @@ func main() {
 
 	fmt.Println(<-leftmost)
 }
-

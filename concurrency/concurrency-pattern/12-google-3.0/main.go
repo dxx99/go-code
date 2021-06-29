@@ -10,9 +10,9 @@ type Result string
 type Search func(query string) Result
 
 var (
-	Web1 = fakeSearch("web1")
-	Web2 = fakeSearch("web2")
-	Web3 = fakeSearch("web3")
+	Web1   = fakeSearch("web1")
+	Web2   = fakeSearch("web2")
+	Web3   = fakeSearch("web3")
 	Image1 = fakeSearch("Image1")
 	Image2 = fakeSearch("Image2")
 	Image3 = fakeSearch("Image3")

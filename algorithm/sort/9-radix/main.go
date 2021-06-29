@@ -46,7 +46,7 @@ func radixSort(nums []int) []int {
 
 		//把数据放到radixList中
 		for _, item := range nums {
-			rKey := (item%mod) / dev
+			rKey := (item % mod) / dev
 			radixList[rKey] = append(radixList[rKey], item)
 		}
 

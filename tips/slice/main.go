@@ -7,11 +7,11 @@ func main() {
 	s := make([]int, 0)
 
 	// 增加
-	s = append(s, []int{1,2,3,4}...)
+	s = append(s, []int{1, 2, 3, 4}...)
 	fmt.Printf("after append item, slice = %v\n", s)
 
 	// 合并slice
-	b := []int{3,4,5,6}
+	b := []int{3, 4, 5, 6}
 	s = append(s, b...)
 	fmt.Printf("after merge slice, slice = %v\n", s)
 
@@ -45,5 +45,3 @@ func main() {
 	}
 	fmt.Printf("reverse slice is = %v\n", s)
 }
-
-

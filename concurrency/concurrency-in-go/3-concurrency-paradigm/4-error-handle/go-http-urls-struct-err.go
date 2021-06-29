@@ -7,10 +7,9 @@ import (
 
 // Result 通过结构体包装错误
 type Result struct {
-	Error error
+	Error    error
 	Response *http.Response
 }
-
 
 func main() {
 
@@ -37,8 +36,7 @@ func main() {
 	}
 
 	done := make(chan interface{})
-	defer close(done)	// 这里也可以用作超时控制
-
+	defer close(done) // 这里也可以用作超时控制
 
 	urls := []string{"https://baidu.com", "https://badhost"}
 

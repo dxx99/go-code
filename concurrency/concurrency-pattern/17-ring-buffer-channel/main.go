@@ -6,7 +6,7 @@ import "fmt"
 // https://tanzu.vmware.com/content/blog/a-channel-based-ring-buffer-in-go
 
 type RingBuffer struct {
-	inputChannel <-chan int
+	inputChannel  <-chan int
 	outputChannel chan int
 }
 
@@ -23,7 +23,7 @@ func (r *RingBuffer) Run() {
 		case r.outputChannel <- v:
 		default:
 			fmt.Printf("丢弃任务：%d\n", <-r.outputChannel)
-			r.outputChannel <-v
+			r.outputChannel <- v
 		}
 	}
 	close(r.outputChannel)
@@ -37,7 +37,7 @@ func main() {
 
 	go func() {
 		// do task
-		for res := range out{
+		for res := range out {
 			fmt.Printf("working %d\n", res)
 		}
 	}()
@@ -47,6 +47,5 @@ func main() {
 		in <- i
 	}
 	close(in)
-
 
 }

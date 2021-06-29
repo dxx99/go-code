@@ -23,7 +23,7 @@ func insertSort(nums []int) []int {
 	for i := 1; i < len(nums); i++ {
 		for k := len(res) - 1; k >= 0; k-- {
 			// 当插入的元素为最小
-			if k == 0 && nums[i] < res[k]  {
+			if k == 0 && nums[i] < res[k] {
 				res = append([]int{nums[i]}, res...)
 				break
 			}

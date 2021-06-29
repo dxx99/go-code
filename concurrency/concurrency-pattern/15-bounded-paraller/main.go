@@ -49,19 +49,19 @@ func walkFiles(done <-chan struct{}, root string) (<-chan string, <-chan error) 
 // result is the product of reading and summing a file using Md5
 type result struct {
 	path string
-	sum md5HashByte
-	err error
+	sum  md5HashByte
+	err  error
 }
 
 // digester reads paths name from paths and sends digests of the corresponding files on c until
 // either paths or done is closed
-func digester(done <-chan struct{}, paths <-chan string, c chan<- result)  {
+func digester(done <-chan struct{}, paths <-chan string, c chan<- result) {
 	for path := range paths {
 		data, err := ioutil.ReadFile(path)
 
 		// 防止处理任务阻塞 select-case 模型
 		select {
-		case c <-result{
+		case c <- result{
 			path: path,
 			sum:  md5.Sum(data),
 			err:  err,
@@ -106,7 +106,7 @@ func Md5All(root string) (map[string]md5HashByte, error) {
 	}
 
 	// check whether the walk failed
-	if e := <- err; e != nil {
+	if e := <-err; e != nil {
 		return nil, e
 	}
 	return m, nil

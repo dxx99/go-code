@@ -43,7 +43,7 @@ func bubbleSort(nums []int) []int {
 	for i := 0; i < l; i++ {
 
 		// Core: no-sort-data pre round, and Maximum sorting range
-		for k := 0; k < l - 1 - i; k++ {
+		for k := 0; k < l-1-i; k++ {
 			// Compare Exchange
 			if nums[k] > nums[k+1] {
 				nums[k], nums[k+1] = nums[k+1], nums[k]

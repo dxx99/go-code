@@ -14,11 +14,11 @@ func main() {
 		}{}
 	}}
 
-	myPool.Get()	//1 这里我们调用get方法，将调用在池中定义的new函数，因为实例尚未实例化
+	myPool.Get() //1 这里我们调用get方法，将调用在池中定义的new函数，因为实例尚未实例化
 	ins := myPool.Get()
 	fmt.Println(ins)
 	myPool.Put(ins) //2 将先前检索的实例放回池中，这时实例的可用数量为1
 	myPool.Get()
 
-	myPool.Get()  //3对象池中没有实例，这个时候就要创建实例
+	myPool.Get() //3对象池中没有实例，这个时候就要创建实例
 }

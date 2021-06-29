@@ -9,10 +9,10 @@ import (
 
 func connectToServ() interface{} {
 	time.Sleep(1 * time.Second)
-	return struct {}{}
+	return struct{}{}
 }
 
-func main()  {
+func main() {
 	serv, err := net.Listen("tcp", "localhost:8011")
 	if err != nil {
 		log.Fatalf("Cannot listen: %v\n", err)
@@ -36,5 +36,5 @@ func main()  {
 		}()
 		_ = conn.Close()
 	}
-	
+
 }

@@ -12,6 +12,7 @@ func boring(msg string) {
 		time.Sleep(time.Duration(rand.Intn(1e3)) * time.Millisecond)
 	}
 }
+
 // code source:
 // https://talks.golang.org/2012/concurrency.slide#16
 func main() {

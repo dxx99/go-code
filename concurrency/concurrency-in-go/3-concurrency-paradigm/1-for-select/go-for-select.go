@@ -18,7 +18,7 @@ func main() {
 	}
 
 	// 无限循环等待停止
- 	go func() {
+	go func() {
 		for {
 			select {
 			case <-done:
@@ -29,7 +29,6 @@ func main() {
 			//执行非抢占式任务
 		}
 	}()
-
 
 	//2. 变种
 	go func() {
@@ -42,7 +41,5 @@ func main() {
 			}
 		}
 	}()
-
-
 
 }

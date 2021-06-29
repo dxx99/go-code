@@ -10,12 +10,12 @@ import (
 
 // Message define a message type that contains a channel for the reply
 type Message struct {
-	str string
+	str  string
 	wait chan bool
 }
 
 // fanIn message many chan Message
-func fanIn(inputs ...<-chan Message) <-chan Message{
+func fanIn(inputs ...<-chan Message) <-chan Message {
 	ch := make(chan Message)
 	for _, input := range inputs {
 		go func(input <-chan Message) {
@@ -41,7 +41,7 @@ func boring(msg string) <-chan Message {
 
 			// every time the goroutine send message
 			// this code waits until the value to be received
-			<- waitForIt
+			<-waitForIt
 		}
 	}()
 
@@ -66,8 +66,10 @@ func main() {
 	//   wait <-true                                                  |
 	///                            REPEAT THE PROCESS
 	for i := 0; i < 5; i++ {
-		msg1 := <-ch; fmt.Println(msg1.str)
-		msg2 := <-ch; fmt.Println(msg2.str)
+		msg1 := <-ch
+		fmt.Println(msg1.str)
+		msg2 := <-ch
+		fmt.Println(msg2.str)
 
 		// each goroutine have to wait
 		// main goroutine allows the boring goroutine to send next value to message channel

@@ -24,24 +24,23 @@ func getRandArray(n int) []int {
 // 2. 按增量序列个数k，对序列进行k 趟排序；
 // 3. 每趟排序，根据对应的增量ti，将待排序列分割成若干长度为m 的子序列，分别对各子表进行直接插入排序。仅增量因子为1 时，整个序列作为一个表来处理，表长度即为整个序列的长度。
 func shellSort(nums []int) []int {
-	inc := 2	// 增量
-	step := len(nums)/inc  //初始步长
+	inc := 2                // 增量
+	step := len(nums) / inc //初始步长
 
 	for step >= 1 {
 		for i := step; i < len(nums); i++ {
 			for j := i; j >= step; j -= step {
-				if nums[j] < nums[j - step] {
+				if nums[j] < nums[j-step] {
 					// 右边比左边的值大，则交换
 					nums[j], nums[j-step] = nums[j-step], nums[j]
 				}
 			}
 		}
 		// 对每轮步长的替换
-		step = step/inc
+		step = step / inc
 	}
 	return nums
 }
-
 
 // 希尔排序
 // 动画： https://www.cs.usfca.edu/~galles/visualization/ComparisonSort.html

@@ -23,7 +23,7 @@ func boring(msg string) <-chan string {
 func main() {
 	ch := boring("Joe")
 
-	timeout := time.After(3* time.Second)
+	timeout := time.After(3 * time.Second)
 	for {
 		select {
 

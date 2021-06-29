@@ -13,7 +13,7 @@ func main() {
 			defer close(intStream)
 			for _, i := range integers {
 				select {
-				case <-done:	//防止协程泄露
+				case <-done: //防止协程泄露
 					return
 				case intStream <- i:
 				}
@@ -21,7 +21,6 @@ func main() {
 		}()
 		return intStream
 	}
-
 
 	// 叠乘器
 	multiply := func(done <-chan interface{}, intStream <-chan int, multiplier int) <-chan int {
@@ -39,7 +38,6 @@ func main() {
 
 		return multipliedStream
 	}
-
 
 	//叠加器
 	add := func(done <-chan interface{}, intStream <-chan int, additive int) <-chan int {

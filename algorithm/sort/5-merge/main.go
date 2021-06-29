@@ -26,7 +26,7 @@ func mergeSort(nums []int) []int {
 	if len(nums) < 2 {
 		return nums
 	}
-	mid :=  len(nums)/2
+	mid := len(nums) / 2
 
 	return func(left, right []int) []int {
 		res := make([]int, 0)
@@ -43,16 +43,15 @@ func mergeSort(nums []int) []int {
 		}
 
 		// 左右元素还有的情况
-		if len(left)>0 {
+		if len(left) > 0 {
 			res = append(res, left...)
 		}
-		if len(right)>0 {
+		if len(right) > 0 {
 			res = append(res, right...)
 		}
 		return res
 	}(mergeSort(nums[:mid]), mergeSort(nums[mid:]))
 }
-
 
 func main() {
 	nums := getRandArray(20)

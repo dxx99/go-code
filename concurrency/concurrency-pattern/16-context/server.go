@@ -13,7 +13,7 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8011", nil))
 }
 
-func handler(w http.ResponseWriter, r *http.Request)  {
+func handler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log.Println("handler starting")
 	defer log.Println("handler stopping")
@@ -26,7 +26,7 @@ func handler(w http.ResponseWriter, r *http.Request)  {
 		vTime = time.Duration(1000)
 	}
 	ctx, cancel := context.WithCancel(r.Context())
-	time.AfterFunc(vTime * time.Millisecond, cancel)
+	time.AfterFunc(vTime*time.Millisecond, cancel)
 
 	select {
 	case <-time.After(5 * time.Second):

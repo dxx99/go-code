@@ -27,7 +27,7 @@ func main() {
 	}
 
 	// 处理的数据传给某channel
-	take := func(done <-chan interface{}, valueStream <-chan interface{}, num int, ) <-chan interface{} {
+	take := func(done <-chan interface{}, valueStream <-chan interface{}, num int) <-chan interface{} {
 
 		takeStream := make(chan interface{})
 		go func() {

@@ -10,7 +10,7 @@ type Result string
 type Search func(query string) Result
 
 var (
-	Web = fakeSearch("web")
+	Web   = fakeSearch("web")
 	Image = fakeSearch("Image")
 	Video = fakeSearch("video")
 )
