@@ -71,7 +71,7 @@
 - 心跳
 - 请求并发复制处理
     - 大多数服务都是为了更快的处理响应
-- 速率限制
+- [速率限制](./3-concurrency-paradigm/7-rate-limit/Readme.md)
 - goroutines异常行为修复
 
 ### goroutine in runtime
