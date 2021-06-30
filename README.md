@@ -10,6 +10,4 @@ Collecting code related snippets for easy development
 
 
 ## tips
-一些常见的编程小技巧
-- [slice相关操作](./tips/slice/main.go)
-
+[编程小技巧](./tips/Readme.md)
