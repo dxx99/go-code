@@ -81,4 +81,24 @@
 - go接口的语义使go具有敏姐，轻量级的主要原因之一
 
 #### 如果保证某个对象实现了某个接口
+```go
+package main
+type T struct{}
+type I interface {}
+var _ I = T{}           // Verify that T implements I.
+var _ I = (*T)(nil)     // Verify that *T implements I.
+```
+
+#### []T类型是否可以覆盖给[]interface{} 
+- 可以
+- [示例](../../tips/interface/interface-implements/interface_to_t.go)
+
+#### 如何T1和T2有相同的底层结构，可以直接将[]T1转换成T2?
+- 不可以
+- 复合数据的类型转换没法直接使用转换
+- [示例](../../tips/interface/interface-implements/convert_T_same_underlying_type.go)
+
+
+#### 为什么我的nil错误值不等于nil
+
 
