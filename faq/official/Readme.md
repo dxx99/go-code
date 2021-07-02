@@ -59,6 +59,19 @@
 - 不受控制的map会导致程序崩溃
 - [原子操作](https://blog.csdn.net/codragon/article/details/112526621)
 
+#### 为啥要内置map
+- 它是一种强大而重要的内置数据结构，提供具有语法支持的出色实现，使编程更加愉快
+- map足够强大，可以为绝大多数用途服务
+
+#### 为啥map不允许切片作为键
+- 映射查找需要一个相等运算符，切片没有实现
+- slice，map，function 不可以，
+-  数字、string、bool、array、channel、指针可以，以及 包含前面类型的 struct 可以
+- 为结构和数组定义了相等性，因此此类类型可以用作映射键
+
+#### 为啥map,slice,channel是引用，而array是值类型
+- 
+
 ### 类型
 #### go是面向对象语言吗？
 - 是或否，有类型或方法，并允许面向对象编程风格，但没有类型层次结构
@@ -98,7 +111,21 @@ var _ I = (*T)(nil)     // Verify that *T implements I.
 - 复合数据的类型转换没法直接使用转换
 - [示例](../../tips/interface/interface-implements/convert_T_same_underlying_type.go)
 
-
 #### 为什么我的nil错误值不等于nil
+- 当一个interface的value和type都是unset的时候，它才等于nil
+- 可以通过reflect来看类型和值
+- [示例](../../tips/nil/nil_not_equal_nil.go)
+
+#### 为啥不提供隐似类型转换
+- C中数字类型之间自动转换的便利性被它引起的混乱所抵消
+- 什么时候表达式是无符号的？价值有多大？会溢出吗？
+- 结果是否可移植，独立于执行它的机器？它也使编译器复杂化；
+- “通常的算术转换”不容易实现，并且跨架构不一致。
+
+#### go常量是如何工作的？
+- go对不同数值类型的变量之间的转换很严格，但语言中的常量要灵活得多
+- [官方博客](https://blog.golang.org/constants)
+
+
 
 

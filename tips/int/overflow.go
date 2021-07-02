@@ -19,4 +19,8 @@ func main() {
 	var d int8 = -1
 	e := -128/d		//编译器会断言e的类型为-128 -- 127之间
 	fmt.Println(e)	//output: -128  因为结果为128 然后溢出，得到-128
+
+	const x uint8 = 1
+	const y uint8 = 2
+	fmt.Println(x-b)
 }
