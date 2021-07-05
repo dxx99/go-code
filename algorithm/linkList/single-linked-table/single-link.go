@@ -17,6 +17,7 @@ func NewNode(data interface{}) *Node {
 	}
 }
 
+// 定义链表相关接口
 type linkedList interface {
 	InsertHead(v interface{}) error
 	InsertTail(v interface{}) error
@@ -78,7 +79,6 @@ func (s *SList) Delete(k int) error {
 		k--
 	}
 	pre.Next = pre.Next.Next
-
 	return nil
 }
 
