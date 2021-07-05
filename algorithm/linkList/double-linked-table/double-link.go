@@ -54,7 +54,7 @@ func (d *DList) InsertHead(v interface{}) error {
 }
 
 func (d *DList) InsertTail(v interface{}) error {
-	return d.InsertK(d.length, v)
+	return d.InsertK(d.length + 1, v)
 }
 
 func (d *DList) InsertK(k int, v interface{}) error {
@@ -112,10 +112,10 @@ func (d *DList) Search(v interface{}) (int,  error) {
 }
 
 func (d *DList) PrintList() {
-	p := d.head
-	if p.next != nil {
-		p = p.next
+	p := d.head.next
+	for p.next != nil {
 		fmt.Printf("%v ", p.data)
+		p = p.next
 	}
 	fmt.Println()
 }
@@ -129,8 +129,8 @@ func main() {
 	l.InsertHead(2)
 	l.InsertHead(2)
 	l.InsertTail(3)
-	//l.InsertTail(5)
-	l.PrintList()
-	fmt.Println(l.Len())
+	l.InsertTail(5)
+	l.PrintList()	// 2 2 1 1 3 5
+	fmt.Println(l.Len())	//6
 
 }
