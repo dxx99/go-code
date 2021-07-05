@@ -24,7 +24,7 @@ type linkedList interface {
 	InsertK(k int, v interface{}) error
 	Delete(k int)	error
 	Len() int
-	Search(v interface{}) bool
+	Search(v interface{}) (int, error)
 }
 
 // SList 带头节点的链表, 头指针就是链表的名字，仅仅是一个指针而已
@@ -48,7 +48,7 @@ func (s *SList) InsertHead(v interface{}) error {
 }
 
 func (s *SList) InsertTail(v interface{}) error {
-	return s.InsertK(s.Length, v)
+	return s.InsertK(s.Length + 1, v)
 }
 
 func (s *SList) InsertK(k int, v interface{}) error {
@@ -86,15 +86,17 @@ func (s *SList) Len() int {
 	return s.Length
 }
 
-func (s *SList) Search(v interface{}) bool {
+func (s *SList) Search(v interface{}) (int, error) {
 	pre := s.Head
+	k := 0
 	for pre.Next != nil {
 		pre = pre.Next
+		k++
 		if pre.Data == v {
-			return true
+			return k, nil
 		}
 	}
-	return false
+	return -1, errors.New("not found")
 }
 
 func (s *SList) PrintList() {
@@ -115,14 +117,15 @@ func main()  {
 	_ = s.InsertHead(4)
 	_ = s.InsertHead(5)
 	_ = s.InsertHead(6)
-	s.PrintList()			// 6 5 4 3 2 1
+	_ = s.InsertTail(7)
+	s.PrintList()			// 6 5 4 3 2 1 7
 	fmt.Println(s.Len())	// 6
 
 	_ = s.Delete(3)
-	s.PrintList()	//6 5 3 2 1
+	s.PrintList()	//6 5 3 2 1 7
 
-	fmt.Println(s.Search(4))	//false
-	fmt.Println(s.Search(5)) //true
+	fmt.Println(s.Search(4))	//-1 not found
+	fmt.Println(s.Search(5)) //2 <nil>
 
 }
 
