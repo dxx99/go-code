@@ -41,6 +41,12 @@ Collecting code related snippets for easy development
 - 链表
   - [单链表](./algorithm/linkList/single-linked-table/single-link.go)
   - [双链表](./algorithm/linkList/double-linked-table/double-link.go)
+  - [循环单链表](./algorithm/linkList/cycle-single-link/cycle-single-linke.go)
+- 栈
+  - [数组栈](./algorithm/stack/slice-stack/slice-stack.go) 
+- 队列
+  - [环形队列]()
+  
 
 ### 算法实现
 - [排序](./algorithm/sort/Readme.md)
