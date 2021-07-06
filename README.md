@@ -67,6 +67,7 @@ Collecting code related snippets for easy development
 ## [编程小技巧](./tips/Readme.md)
 ### channel
 - [tryLock](./tips/chan/trylock/trylock.go)
+- [服务启动](./tips/chan/serv-run/Readme.md)
 
 ### slice
 - [切片基本操作](./tips/slice/baseop/main.go)
