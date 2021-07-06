@@ -45,7 +45,7 @@ Collecting code related snippets for easy development
 - 栈
   - [数组栈](./algorithm/stack/slice-stack/slice-stack.go) 
 - 队列
-  - [环形队列]()
+  - [环形队列](./algorithm/queue/cycle-queue/cycle-queue.go)
   
 
 ### 算法实现
