@@ -35,6 +35,9 @@ Collecting code related snippets for easy development
 ### 高级话题
 - [速率限制](concurrency/concurrency-in-go/3-concurrency-paradigm/7-rate-limit/Readme.md)
 
+## 标准库学习
+- [unsafe]()
+
 
 ## [数据结构与算法](./algorithm/Readme.md)
 ### 数据结构
@@ -47,7 +50,6 @@ Collecting code related snippets for easy development
 - 队列
   - [环形队列](./algorithm/queue/cycle-queue/cycle-queue.go)
   
-
 ### 算法实现
 - [排序](./algorithm/sort/Readme.md)
     - [冒泡排序](./algorithm/sort/1-bubble/main.go)
@@ -61,8 +63,7 @@ Collecting code related snippets for easy development
     - [基数排序](./algorithm/sort/9-radix/main.go)
     - [堆排序](./algorithm/sort/10-heap/main.go)
 
-## 问答收集
-### [官方faq](faq/official/Readme.md)
+
 
 ## [编程小技巧](./tips/Readme.md)
 ### channel
@@ -76,8 +77,8 @@ Collecting code related snippets for easy development
 - interface类型转换
     - [转换为T](./tips/interface/interface-implements/convert_T_same_underlying_type.go)
     - [验证接口](./tips/interface/interface-implements/implements-verify.go)
-
-
 ### int 
 - [整型溢出](./tips/int/overflow.go)
 
+## 问答收集
+### [官方faq](faq/official/Readme.md)
