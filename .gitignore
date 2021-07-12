@@ -15,5 +15,8 @@
 # vendor/
 .idea/
 
-#
+# 去掉编译文件
+*.o
+
+# 去掉prof文件
 *.prof
