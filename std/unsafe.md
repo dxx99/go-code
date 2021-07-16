@@ -72,6 +72,7 @@ func Slice(ptr *ArbitaryType, len IntegerType) []ArbitraryType
   - uintptr值是一个整数，可以参与算术运算
   - 值与值之间和内存块与值之间的引用关系是通过指针来表征的
 - 不再被使用的内存块的回收时间点是不确定的
+  - [例子](./test/upsafe_test.go) - TestUnsafeMemoryCollect
 - 一个值的地址在程序运行中可能改变
 - 一个值的声明范围可能并没有代码中看上去大
 - *unsafe.Pointer是一个类型安全指针类型

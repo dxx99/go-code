@@ -69,13 +69,12 @@ func TestUnsafeMemoryCollect(t *testing.T)  {
 	var x1 = unsafe.Pointer(y)				// 和y一样引用着同一个值
 	var x2 = uintptr(unsafe.Pointer(z))
 
-
-
+	// 此时，即使z指针值所引用的int值的地址仍旧存储 ，在x2值中，但是此int值已经不再被使用了，所以垃圾 回收器认为可以回收它所占据的内存块了。
+	//另一方面， x和x1各自所引用的int值仍旧将在下面被使用。
 
 	// uintptr值可以参与算术运算
-
 	x2 += 2
-	fmt.Println(x2)
+	fmt.Println(x2)	// 824633992922
 	x2--
 	x2--
 
@@ -84,7 +83,7 @@ func TestUnsafeMemoryCollect(t *testing.T)  {
 	*(*int)(unsafe.Pointer(x2)) = 3
 
 	fmt.Println(*x, *y, *z, *(*int)(x1), x2)
-
-
 }
+
+
 
