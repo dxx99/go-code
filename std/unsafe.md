@@ -1,4 +1,7 @@
 ## 非类型安全指针
+- 主要目的
+  - 类型转换
+  - 通过uintptr, 支持算术运算
 
 ### 前言
 - go指针的限制(也叫类型安全的指针)
@@ -74,5 +77,127 @@ func Slice(ptr *ArbitaryType, len IntegerType) []ArbitraryType
 - 不再被使用的内存块的回收时间点是不确定的
   - [例子](./test/upsafe_test.go) - TestUnsafeMemoryCollect
 - 一个值的地址在程序运行中可能改变
+  - 一个协程的栈大小发送改变时，开辟在此栈上的内存块需要移动，从而相应的的值地址将改变
 - 一个值的声明范围可能并没有代码中看上去大
+  - [例子](./test/upsafe_test.go) - TestUnsafeLiveArea
 - *unsafe.Pointer是一个类型安全指针类型
+
+### 如何正确使用非类型安全指针
+[标准库列出了六种使用模式](https://golang.google.cn/pkg/unsafe/#Pointer)
+1. 将*T1的值转换成非类型安全指针，然后将此非类型安全指针转成类型*T2
+
+```go
+package unsafe_test
+import (
+  "fmt"
+  "reflect"
+  "testing"
+  "unsafe"
+)
+func TestUnsafeMyStringToString(t *testing.T) {
+  type MyString string
+  a := []MyString{"PHP", "Python", "Golang"}
+  b := *(*[]string)(unsafe.Pointer(&a))
+  b[1] = "Rust"
+
+  fmt.Printf("a'type = %v, b'type = %v \n ", reflect.TypeOf(a), reflect.TypeOf(b))
+  fmt.Println("a =", a, "b =", b)
+}
+```
+
+2. 将一个非类型安全的指针转换成一个uintptr值，然后使用uintptr
+- 不是很有用，使用的比较少
+
+3. 将一个非类型安全的指针转成uintptr, 然后用uintptr进行算术运算，再将算术运算的结构uintptr转成非类型安全指针
+```go
+package main
+
+import "fmt"
+import "unsafe"
+
+type T struct {
+	x bool
+	y [3]int16
+}
+
+const N = unsafe.Offsetof(T{}.y)
+const M = unsafe.Sizeof(T{}.y[0])
+
+func main() {
+	t := T{y: [3]int16{123, 456, 789}}
+	p := unsafe.Pointer(&t)
+	// "uintptr(p) + N + M + M"为t.y[2]的内存地址。
+	ty2 := (*int16)(unsafe.Pointer(uintptr(p)+N+M+M))
+	fmt.Println(*ty2) // 789
+}
+```
+- 1.7之后用的unsafe.Add函数来完成。
+
+4. 将非类型安全指针值转换为uintptr值，并传递给syscall.Syscall函数调用
+- 什么叫系统调用？
+
+5. 将reflect.Value.Pointer 或 reflect.Value.UnsafeAddr的 uintptr的返回值转换成非类型安全的指针
+- reflect标准库包中的Value类型的Pointer和UnsafeAddr方法都返回一个uintptr值，而不是一个unsafe.Pointer值
+- 这样设计的目的是避免用户不引用unsafe标准库包就可以将这两个方法的返回值（如果是unsafe.Pointer类型）转换为任何类型安全指针类型
+
+*这样的设计需要我们将这两个方法的调用的uintptr结果立即转换为非类型安全指针。
+否则，将出现一个短暂的可能导致处于返回的地址处的内存块被回收掉的时间窗。
+此时间窗是如此短暂以至于此内存块被回收掉的几率非常之低，
+因而这样的编程错误造成的bug的重现几率亦十分得低。*
+```
+// 这样是安全的
+p := (*int)(unsafe.Pointer(reflect.ValueOf(new(int)).Pointer()))
+
+u := reflect.ValueOf(new(int)).Pointer()
+// 在这个时刻，处于存储在u中的地址处的内存块
+// 可能会被回收掉。
+p := (*int)(unsafe.Pointer(u))
+```  
+
+6. 将一个reflect.SliceHeader 或者 reflect.StringHeader值的Data字段转换为非类型安全指针，以及其逆转换
+```go
+package main
+
+import "fmt"
+import "unsafe"
+import "reflect"
+
+func main() {
+	a := [...]byte{'G', 'o', 'l', 'a', 'n', 'g'}
+	s := "Java"
+	hdr := (*reflect.StringHeader)(unsafe.Pointer(&s))
+	hdr.Data = uintptr(unsafe.Pointer(&a))
+	hdr.Len = len(a)
+	fmt.Println(s) // Golang
+	// 现在，字符串s和切片a共享着底层的byte字节序列，
+	// 从而使得此字符串中的字节变得可以修改。
+	a[2], a[3], a[4], a[5] = 'o', 'g', 'l', 'e'
+	fmt.Println(s) // Google
+}
+```
+
+```go
+package main
+
+import (
+  "fmt"
+  "reflect"
+  "unsafe"
+)
+
+func main() {
+  a := [6]byte{'G', 'o', '1', '0', '1'}
+  bs := []byte("Golang")
+  hdr := (*reflect.SliceHeader)(unsafe.Pointer(&bs))
+  hdr.Data = uintptr(unsafe.Pointer(&a))
+
+  hdr.Len = 2
+  hdr.Cap = len(a)
+  fmt.Printf("%s\n", bs) // Go
+  bs = bs[:cap(bs)]
+  fmt.Printf("%s\n", bs) // Go101
+}
+```
+
+
+

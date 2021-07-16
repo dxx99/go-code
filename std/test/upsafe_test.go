@@ -2,6 +2,7 @@ package main_test
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 	"unsafe"
 )
@@ -84,6 +85,41 @@ func TestUnsafeMemoryCollect(t *testing.T)  {
 
 	fmt.Println(*x, *y, *z, *(*int)(x1), x2)
 }
+
+
+func TestUnsafeLiveArea(t *testing.T)  {
+	type s struct{
+		x int
+		y *[1<<32]byte
+	}
+	a := s{
+		x: 0,
+		y: new([1<<32]byte),
+	}
+	p := uintptr(unsafe.Pointer(&a.y))
+	fmt.Println("before: ", p)
+	//... 使用a.x a.y
+
+	// 一个聪明的编辑器能够察觉到值a.y将不会再被用到
+	// 所以认为a.y值所占的内存块可以被回收了
+
+	*(*byte)(unsafe.Pointer(p)) = 1	// 危险操作
+	fmt.Println("after: ", p)
+	fmt.Println(a.x)
+}
+
+func TestUnsafeMyStringToString(t *testing.T)  {
+	type MyString string
+	a := []MyString{"PHP", "Python", "Golang"}
+	b := *(*[]string)(unsafe.Pointer(&a))
+	b[1] = "Rust"
+
+
+	fmt.Printf("a'type = %v, b'type = %v \n ", reflect.TypeOf(a), reflect.TypeOf(b))
+	fmt.Println("a =", a, "b =",b)
+}
+
+
 
 
 
