@@ -36,7 +36,7 @@ Collecting code related snippets for easy development
 - [速率限制](concurrency/concurrency-in-go/3-concurrency-paradigm/7-rate-limit/Readme.md)
 
 ## 标准库学习
-- [unsafe]()
+- [unsafe](./std/unsafe.md)
 
 
 ## [数据结构与算法](./algorithm/Readme.md)
