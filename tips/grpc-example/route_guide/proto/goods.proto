@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+option go_package = "github.com/dxx99/go-code/tips/go-example/goods";
+
+package goods;
+
+service GoodsServer {
+
+}
+
+message GoodsInfoReq {
+  string gid = 1;
+}
+
+message GoodsInfoResp {
+
+}

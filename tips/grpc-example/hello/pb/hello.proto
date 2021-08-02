@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+option go_package = "github.com/dxx99/go-code/tips/grpc-example/hello/pb";
+
+package pb;
+
+message HelloReq {
+  string name = 1;
+}
+
+message HelloResp {
+  string msg = 1;
+}
+
+service HelloServ {
+  rpc SayHello(HelloReq) returns (HelloResp) {};
+}
