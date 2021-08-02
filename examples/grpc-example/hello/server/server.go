@@ -6,7 +6,6 @@ import (
 	"log"
 	"net"
 
-	"google.golang.org/grpc"
 	"grpc-example/hello/pb"
 )
 
@@ -29,12 +28,12 @@ func main() {
 		log.Fatalln("connect failure ", err)
 	}
 
-	ser := grpc.NewServer()
-	pb.RegisterHelloServServer(ser, NewHelloServ())
+	//ser := grpc.NewServer()
+	//pb.RegisterHelloServServer(ser, NewHelloServ())
 
 	log.Printf("server listening at %v\n", lis.Addr())
 
-	err = ser.Serve(lis)
+	//err = ser.Serve(lis)
 	if err != nil {
 		fmt.Println("exception: ", err.Error())
 	}
