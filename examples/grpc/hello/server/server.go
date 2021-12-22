@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc"
 	"log"
 	"net"
 
-	"grpc-example/hello/pb"
+	"grpc/hello/pb"
 )
 
 type HelloServ struct {
@@ -23,17 +24,17 @@ func (h *HelloServ) SayHello(ctx context.Context, req *pb.HelloReq) (*pb.HelloRe
 
 func main() {
 
-	lis, err := net.Listen("tcp", "localhost:5000")
+	lis, err := net.Listen("tcp", ":9001")
 	if err != nil {
 		log.Fatalln("connect failure ", err)
 	}
 
-	//ser := grpc.NewServer()
-	//pb.RegisterHelloServServer(ser, NewHelloServ())
+	ser := grpc.NewServer()
+	pb.RegisterHelloServServer(ser, NewHelloServ())
 
 	log.Printf("server listening at %v\n", lis.Addr())
 
-	//err = ser.Serve(lis)
+	err = ser.Serve(lis)
 	if err != nil {
 		fmt.Println("exception: ", err.Error())
 	}

@@ -1,4 +1,4 @@
-module grpc-example
+module grpc
 
 go 1.16
 

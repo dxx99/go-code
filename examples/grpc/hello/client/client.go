@@ -3,16 +3,18 @@ package main
 import (
 	"context"
 	"google.golang.org/grpc"
-	"grpc-example/hello/pb"
+	"grpc/hello/pb"
 	"log"
 	"time"
 )
 
 func main() {
-	conn, err := grpc.Dial(":5000", grpc.WithInsecure())
+
+	conn, err := grpc.Dial(":9001", grpc.WithInsecure())
 	if err != nil {
-		log.Fatalln("dail failure ", err)
+		log.Fatal("dial error: ", err)
 	}
+
 	defer func(conn *grpc.ClientConn) {
 		err := conn.Close()
 		if err != nil {

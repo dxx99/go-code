@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+option go_package = "github.com/dxx99/go-code/examples/grpc/route_guide/proto";
+
+package proto;
+
+service RouteGuide {
+
+  //1. 通过这个点，得到这个点的位置
+  rpc GetFeature(Point) returns (Feature) {}
+
+  //2. 服务端返回流数据给客户端
+  rpc ListFeatures(Rectangle) returns (stream Feature) {}
+
+  //3. 客户端上传流数据给客户端
+  rpc RecordRoute(stream Point) returns (RouteSummary) {}
+
+  //4. 客户端上传流数据，服务端响应流数据
+  rpc RouteChat(stream RouteNote) returns (stream RouteNote) {}
+}
+
+message Point {
+  int32 x = 1;
+  int32 y = 2;
+}
+
+// 矩形的两个脚
+message Rectangle {
+  Point lo = 1;
+  Point hi = 2;
+}
+
+message Feature {
+  string name = 1;
+  Point location = 2;
+}
+
+message RouteNote {
+  Point location = 1;
+  string msg = 2;
+}
+
+message RouteSummary {
+  int32 point_count = 1;
+  int32 feature_count = 2;
+  int32 distance = 3;
+  int32 elapsed_time = 4;
+}
