@@ -32,7 +32,7 @@ func main() {
 	PrintGetFeature(ctx, cli)
 
 	// 2. get stream point
-	//PrintListFeature(ctx, cli)
+	PrintListFeature(ctx, cli)
 
 	// 3. upload stream point
 	PrintRecordRoute(ctx, cli)
