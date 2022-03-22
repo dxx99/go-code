@@ -38,7 +38,33 @@ type TreeNode struct {
 	Right *TreeNode
 }
 
-//TODO: 实现这个方法
+// 广度优先搜索  使用递归和队列
 func levelOrder(root *TreeNode) [][]int {
-	return nil
+	res := make([][]int, 0)
+	queue := make([]*TreeNode, 0)
+
+	if root == nil {
+		return res
+	}
+
+	queue = append(queue, root)
+	for len(queue) > 0 {
+		tmp := make([]int, 0)
+		tmpQ := make([]*TreeNode, 0)
+		for _, node := range queue {
+			tmp = append(tmp, node.Val)
+			if node.Left != nil {
+				tmpQ = append(tmpQ, node.Left)
+			}
+			if node.Right != nil {
+				tmpQ = append(tmpQ, node.Right)
+			}
+		}
+		res = append(res, tmp)
+
+		//替换
+		queue = tmpQ
+	}
+
+	return res
 }
