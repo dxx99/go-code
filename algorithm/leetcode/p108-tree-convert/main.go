@@ -40,7 +40,19 @@ type TreeNode struct {
 	Right *TreeNode
 }
 
-//TODO: 实现这个方法
+// TODO: 实现这个方法
+// 找到中间节点，然后建立二叉树
 func sortedArrayToBST(nums []int) *TreeNode {
 	return nil
+}
+
+func helper(nums []int, left, right int) *TreeNode {
+	if left > right {
+		return nil
+	}
+	mid := (left + right)/2
+	root := &TreeNode{Val: nums[mid]}
+	root.Left = helper(nums, left, mid-1)
+	root.Right = helper(nums, mid+1, right)
+	return root
 }

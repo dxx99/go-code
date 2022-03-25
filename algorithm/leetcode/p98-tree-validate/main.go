@@ -67,7 +67,8 @@ func helper(root *TreeNode, lower *TreeNode, upper *TreeNode) bool {
 }
 
 
-// 中序遍历解法
+// 中序遍历解法 利用栈来进行遍历 只有栈空，或节点为nil才终止
+// 先压左节点 -> 根节点 -> 右节点
 func isValidBSTV2(root *TreeNode) bool {
 	stack := make([]*TreeNode, 0)
 	inOrderNum := math.MinInt64

@@ -38,7 +38,7 @@ type TreeNode struct {
 	Right *TreeNode
 }
 
-// 广度优先搜索  使用递归和队列
+// 广度优先搜索  使用队列来实现
 func levelOrder(root *TreeNode) [][]int {
 	res := make([][]int, 0)
 	queue := make([]*TreeNode, 0)
