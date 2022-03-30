@@ -1,4 +1,7 @@
 package main
+
+import "fmt"
+
 // 108. 将有序数组转换为二叉搜索树
 // 给你一个整数数组 nums ，其中元素已经按 升序 排列，请你将其转换为一棵 高度平衡 二叉搜索树。
 //
@@ -31,7 +34,8 @@ package main
 //链接：https://leetcode-cn.com/problems/convert-sorted-array-to-binary-search-tree
 //著作权归领扣网络所有。商业转载请联系官方授权，非商业转载请注明出处。
 func main() {
-
+	m := (3+4)/2
+	fmt.Println(m)
 }
 
 type TreeNode struct {
@@ -43,14 +47,14 @@ type TreeNode struct {
 // TODO: 实现这个方法
 // 找到中间节点，然后建立二叉树
 func sortedArrayToBST(nums []int) *TreeNode {
-	return nil
+	return helper(nums, 0, len(nums) - 1)
 }
 
 func helper(nums []int, left, right int) *TreeNode {
 	if left > right {
 		return nil
 	}
-	mid := (left + right)/2
+	mid := (left + right)/2		// 选择小的，也就是左边的为根节点， 还可以选择右边的为根节点
 	root := &TreeNode{Val: nums[mid]}
 	root.Left = helper(nums, left, mid-1)
 	root.Right = helper(nums, mid+1, right)
