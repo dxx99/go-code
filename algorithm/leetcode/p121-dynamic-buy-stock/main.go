@@ -1,4 +1,7 @@
 package main
+
+import "fmt"
+
 // 121. 买卖股票的最佳时机
 // 给定一个数组 prices ，它的第 i 个元素 prices[i] 表示一支给定股票第 i 天的价格。
 //
@@ -31,10 +34,51 @@ package main
 //链接：https://leetcode-cn.com/problems/best-time-to-buy-and-sell-stock
 //著作权归领扣网络所有。商业转载请联系官方授权，非商业转载请注明出处。
 func main() {
+	fmt.Println(maxProfit([]int{7,1,5,3,6,4}))
+	fmt.Println(maxProfit([]int{7,6,4,3,1}))
+	fmt.Println("V2...............")
+	fmt.Println(maxProfitV2([]int{7,1,5,3,6,4}))
+	fmt.Println(maxProfitV2([]int{7,6,4,3,1}))
+	fmt.Println(maxProfitV2([]int{2,1,2,1,0,1,2}))   // 2
 
 }
 
-//TODO: 实现这个方法
+// 暴利解法，双循环
 func maxProfit(prices []int) int {
-	return 0
+	profit := 0
+	l := len(prices)
+	for i := 0; i < l; i++ {
+		for j := i+1; j < l; j++ {
+			if prices[j] - prices[i] > profit {
+				profit = prices[j] - prices[i]
+			}
+		}
+	}
+	return profit
+}
+
+// 动态规划
+// 类似于前面提到的子数组最大的和
+// 存储： 今天之前买入最小值
+// 比较： 今天卖出的最大收益，也是之前的最小值与今天值的比较，如果之前大于今天值，则替换存储，将今天的收益变为0
+// 计算:  从所有存储的每天收益中获取最大的收益
+func maxProfitV2(prices []int) int {
+	profit := 0
+	l := len(prices)
+	if l == 0 {
+		return profit
+	}
+	min := prices[0]
+	for i := 1; i < l; i++ {
+		// 是否替换最小值
+		if prices[i] < min {
+			min = prices[i]
+		}
+
+		// 比较当天最大收益与历史最大收益
+		if prices[i] - min > profit {
+			profit = prices[i] - min
+		}
+	}
+	return profit
 }

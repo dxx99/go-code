@@ -1,4 +1,9 @@
 package main
+
+import (
+	"fmt"
+)
+
 // 278. 第一个错误的版本
 // 你是产品经理，目前正在带领一个团队开发新的产品。不幸的是，你的产品的最新版本没有通过质量检测。由于每个版本都是基于之前的版本开发的，所以错误的版本之后的所有版本都是错的。
 //
@@ -31,7 +36,8 @@ package main
 //链接：https://leetcode-cn.com/problems/first-bad-version
 //著作权归领扣网络所有。商业转载请联系官方授权，非商业转载请注明出处。
 func main() {
-
+	fmt.Println(firstBadVersion(21))
+	fmt.Println(firstBadVersionV2(21))
 }
 
 /**
@@ -42,10 +48,47 @@ func main() {
  * func isBadVersion(version int) bool;
  */
 func isBadVersion(version int) bool {
-	return true
+	bad := 11
+	if version >= bad {
+		return true
+	}
+	return false
 }
 
-//TODO: 实现这个防范
+// 变种二分查找
 func firstBadVersion(n int) int {
+	mid := (1 + n) / 2
+	min, max := 1, n
+	for i := 0; i < n; i++ {
+
+		if !isBadVersion(mid) {		// false区间, 表示全部都是正常的版本
+			if isBadVersion(mid + 1) {		// false-true 🔗表示第一个坏版本
+				return mid+1
+			}
+			min = mid + 1
+		} else {     				// true区间，表示全部都是错误的版本
+			if !isBadVersion(mid - 1) {		// false-true 🔗表示第一个坏版本
+				return mid
+			}
+			max = mid - 1
+		}
+		mid = (min + max) / 2
+
+	}
 	return 0
+}
+
+// 优化代码，使用双指针处理
+func firstBadVersionV2(n int) int {
+	left, right := 1, n
+	for left < right {	// 直到左右两边相关才退出
+		mid := (left + right) / 2
+
+		if !isBadVersion(mid) {		// false, 肯定在右边+1
+			left = mid + 1
+		} else {
+			right = mid
+		}
+	}
+	return left
 }
