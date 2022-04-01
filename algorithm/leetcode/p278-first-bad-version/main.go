@@ -39,6 +39,7 @@ import (
 func main() {
 	fmt.Println(firstBadVersion(21))
 	fmt.Println(firstBadVersionV2(21))
+	fmt.Println(firstBadVersionV3(21))
 }
 
 /**

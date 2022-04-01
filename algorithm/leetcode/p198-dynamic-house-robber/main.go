@@ -1,5 +1,7 @@
 package main
 
+import "fmt"
+
 // 198. 打家劫舍
 // 你是一个专业的小偷，计划偷窃沿街的房屋。每间房内都藏有一定的现金，影响你偷窃的唯一制约因素就是相邻的房屋装有相互连通的防盗系统，如果两间相邻的房屋在同一晚上被小偷闯入，系统会自动报警。
 //
@@ -30,10 +32,86 @@ package main
 //链接：https://leetcode-cn.com/problems/house-robber
 //著作权归领扣网络所有。商业转载请联系官方授权，非商业转载请注明出处。
 func main() {
+	fmt.Println(rob([]int{1,2,3,1}))
+	fmt.Println(rob([]int{2,1}))
+	fmt.Println(rob([]int{1,2}))
 
+	fmt.Println("V2........................")
+
+	fmt.Println(robV2([]int{1,2,3,1}))
+	fmt.Println(robV2([]int{2,1}))
+	fmt.Println(robV2([]int{1,2}))
+	fmt.Println(robV2([]int{1}))
 }
 
-//TODO: 实现这个方法
+// 动态规划：推出公式 []int{1,2,3,1}
+// S表示偷多少间房的最大值，H表示当前房屋的财富
+// 第1间房   S0 = H0 = 1
+// 第2间房   S1 = Max(S0, H1) = 2
+// 第3间房   S2 = Max(S1, S0 + H2) = 4
+// 第4间房   S3 = Max(S2, S1 + H3) = 4
+// 第N间房   Sn = Max(Sn-1, Sn-2 + Hn)
 func rob(nums []int) int {
-	return 0
+	l := len(nums)
+
+	// 处理数组为空的结果
+	if l == 0 {
+		return 0
+	}
+
+	// 处理前面两种特殊的值
+	s := make([]int, l)
+
+	for i := 0; i < l; i++ {
+		// 处理两种特殊的条件
+		if i == 0 {
+			s[i] = nums[i]
+			continue
+		}
+		if i == 1 {
+			if s[i-1] > nums[i] {
+				s[i] = s[i-1]
+			} else {
+				s[i] = nums[i]
+			}
+			continue
+		}
+
+		// Sn = Max(Sn-1, Sn-2 + Hn)
+		if s[i-2] + nums[i] > s[i-1] {
+			s[i] = s[i-2] + nums[i]
+		}else {
+			s[i] = s[i-1]
+		}
+	}
+	return s[l-1]
+}
+
+// 动态规划 + 滚动数组
+func robV2(nums []int) int {
+	// 前后两个值来替代数组
+	first, second := 0, 0
+
+	for i, num := range nums {
+		if i == 0 {
+			first, second = num, num	// 防止只有一个元素的求解问题
+			continue
+		}
+		if i == 1 {
+			if first > num {
+				second = first
+			} else {
+				second = num
+			}
+			continue
+		}
+
+		if first + num > second {
+			first, second = second, first + num
+		}else {
+			first = second
+		}
+	}
+
+	return second
 }
