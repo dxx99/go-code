@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sort"
 )
 
 // 278. 第一个错误的版本
@@ -91,4 +92,17 @@ func firstBadVersionV2(n int) int {
 		}
 	}
 	return left
+}
+
+// 直接调用sort包的Search函数
+func firstBadVersionV3(n int) int {
+	b := sort.Search(n, func(version int) bool {
+		return isBadVersion(version)
+	})
+
+	// 排除掉没有坏版本的结果
+	if b == n && !isBadVersion(b) {
+		return 0
+	}
+	return b
 }
