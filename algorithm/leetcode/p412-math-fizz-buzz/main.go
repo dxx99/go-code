@@ -42,7 +42,6 @@ func main() {
 
 }
 
-// TODO 实现这个方法
 func fizzBuzz(n int) []string {
 	ret := make([]string, n)
 	for i := 1; i <= n; i++ {

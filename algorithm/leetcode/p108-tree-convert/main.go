@@ -44,7 +44,6 @@ type TreeNode struct {
 	Right *TreeNode
 }
 
-// TODO: 实现这个方法
 // 找到中间节点，然后建立二叉树
 func sortedArrayToBST(nums []int) *TreeNode {
 	return helper(nums, 0, len(nums) - 1)

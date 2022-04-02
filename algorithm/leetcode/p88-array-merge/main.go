@@ -56,7 +56,6 @@ func main() {
 	mergeV2([]int{4,5,6,0,0,0}, 3, []int{1,2,3}, 3)
 }
 
-//TODO: 实现这个方法
 func merge(nums1 []int, m int, nums2 []int, n int)  {
 	res := make([]int, 0)
 	k1, k2 := 0, 0
@@ -79,7 +78,7 @@ func merge(nums1 []int, m int, nums2 []int, n int)  {
 	}
 	fmt.Println(res)
 }
-
+// 双指针，指向最后一个元素
 func mergeV2(nums1 []int, m int, nums2 []int, n int)  {
 	k1, k2 := m-1, n-1
 	for k := m+n-1; k >= 0; k-- {

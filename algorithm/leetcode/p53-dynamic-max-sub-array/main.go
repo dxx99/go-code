@@ -42,8 +42,6 @@ func main() {
 	fmt.Println(maxSubArrayV3(nums))
 }
 
-//TODO: 实现这个方法
-// 两次循环, 每一轮中找到最大的
 func maxSubArray(nums []int) int {
 	l := len(nums)
 	max := math.MinInt64
@@ -61,6 +59,7 @@ func maxSubArray(nums []int) int {
 
 // 动态规划
 // 如果前一个元素大于零，则将其加到当前元素上
+// f(n) = max(f(n-1), 0) + n
 func maxSubArrayV2(nums []int) int {
 	l := len(nums)
 	if l == 0 {
