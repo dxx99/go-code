@@ -38,8 +38,11 @@ import (
 //链接：https://leetcode-cn.com/problems/squares-of-a-sorted-array
 //著作权归领扣网络所有。商业转载请联系官方授权，非商业转载请注明出处。
 func main() {
-	fmt.Println(sortedSquares([]int{-4,-1,0,3,10}))
+	fmt.Println(sortedSquares([]int{-4,-1,1,3,10}))
 	fmt.Println(sortedSquares([]int{-7,-3,2,3,11}))
+	fmt.Println("V2...........................")
+	fmt.Println(sortedSquaresV2([]int{-4,-1,1,3,10}))
+	fmt.Println(sortedSquaresV2([]int{-7,-3,2,3,11}))
 }
 
 func sortedSquares(nums []int) []int {
@@ -51,12 +54,22 @@ func sortedSquares(nums []int) []int {
 	return nums
 }
 
-//TODO 其他版本求解
+// 双指针求解
 func sortedSquaresV2(nums []int) []int {
-	for k := 0; k < len(nums); k++ {
-		nums[k] = int(math.Pow(float64(nums[k]), 2))
+	l := len(nums)
+	left, right := 0, l-1
+
+	ans := make([]int, l)
+	for left <= right {
+		if nums[right]*nums[right] > nums[left]*nums[left] {
+			ans[l-1] = nums[right]*nums[right]
+			right--
+		} else {
+			ans[l-1] = nums[left]*nums[left]
+			left++
+		}
+		l--
 	}
 
-	sort.Sort(sort.IntSlice(nums))
-	return nums
+	return ans
 }

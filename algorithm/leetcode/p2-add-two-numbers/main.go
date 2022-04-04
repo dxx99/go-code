@@ -111,3 +111,43 @@ func addTwoNumbers(l1 *ListNode, l2 *ListNode) *ListNode {
 	return head
 }
 
+
+func addTwoNumbersV2(l1 *ListNode, l2 *ListNode) *ListNode {
+	head := new(ListNode)
+	ans := head
+	beyondVal := 0
+	for l1 != nil || l2 != nil {
+		n1, n2 := 0, 0
+
+		if l1 != nil {
+			n1 = l1.Val
+			l1 = l1.Next
+		}
+
+		if l2 != nil {
+			n2 = l2.Val
+			l2 = l2.Next
+		}
+
+		cVal := (n1+n2+beyondVal)%10
+		beyondVal = (n1+n2+beyondVal)/10
+		
+		node := &ListNode{
+			Val:  cVal,
+			Next: nil,
+		}
+		head.Next = node
+		head = head.Next
+	}
+
+	// 补充最后没有处理的元素
+	if beyondVal > 0 {
+		head.Next = &ListNode{
+			Val:  beyondVal,
+			Next: nil,
+		}
+	}
+
+	return ans.Next
+}
+
