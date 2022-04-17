@@ -85,7 +85,7 @@ func climbStairsV3(n int) int {
 
 	// 可以创建一个数组，记录各个结果的值
 	f1, f2 := 1, 2
-	for i := 3; i < n; i++ {
+	for i := 3; i <= n; i++ {
 		f1, f2 = f2, f1+f2
 	}
 	return f2

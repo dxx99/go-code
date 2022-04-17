@@ -31,6 +31,8 @@ import (
 //链接：https://leetcode-cn.com/problems/binary-search
 //著作权归领扣网络所有。商业转载请联系官方授权，非商业转载请注明出处。
 func main() {
+	fmt.Println(searchV2([]int{-1,0,3,5,9,12}, 13))
+
 	fmt.Println(search([]int{-1,0,3,5,9,12}, 9))
 	fmt.Println(search([]int{-1,0,3,5,9,12}, 2))
 	fmt.Println("V2.............................")
@@ -62,7 +64,7 @@ func search(nums []int, target int) int {
 
 func searchV2(nums []int, target int) int {
 	k := sort.SearchInts(nums, target)
-	if nums[k] != target {
+	if (k < len(nums) && nums[k] != target) || k >= len(nums) {
 		return -1
 	}
 	return k
