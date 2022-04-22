@@ -75,8 +75,6 @@ func helper(n int, m map[int]int) int {
 	return m[n]
 }
 
-
-
 // 使用迭代求解
 func climbStairsV3(n int) int {
 	if n == 1 {
@@ -89,4 +87,15 @@ func climbStairsV3(n int) int {
 		f1, f2 = f2, f1+f2
 	}
 	return f2
+}
+
+// 动态规划求解
+func climbStairsV4(n int) int {
+	dp := make([]int, n+1)		// 1. 定义dp数组
+
+	dp[1], dp[2] = 1, 2		// 3. 初始化递推数组
+	for i := 3; i <= n; i++ {	//4. 遍历，从什么时候开始，
+		dp[i] = dp[i-1] + dp[i-2]	//2. 推到递推公司
+	}
+	return dp[n]
 }
