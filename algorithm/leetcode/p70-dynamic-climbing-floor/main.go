@@ -37,6 +37,9 @@ func main() {
 	fmt.Println(climbStairsV2(2))
 	fmt.Println(climbStairsV2(3))
 	fmt.Println(climbStairsV2(100))
+	fmt.Println(climbStairsV5(2))
+	fmt.Println(climbStairsV5(3))
+	fmt.Println(climbStairsV5(100))
 }
 
 // 递归请求
@@ -97,5 +100,22 @@ func climbStairsV4(n int) int {
 	for i := 3; i <= n; i++ {	//4. 遍历，从什么时候开始，
 		dp[i] = dp[i-1] + dp[i-2]	//2. 推到递推公司
 	}
+	return dp[n]
+}
+
+// 动态规划 + 完全背包求解
+func climbStairsV5(n int) int {
+	dp := make([]int, n+1)
+	dp[0] = 1
+
+	arr := []int{1,2}
+	for j := 0; j <= n; j++ {
+		for i := 0; i < len(arr); i++ {
+			if j >= arr[i] {
+				dp[j] += dp[j - arr[i]]
+			}
+		}
+	}
+
 	return dp[n]
 }
