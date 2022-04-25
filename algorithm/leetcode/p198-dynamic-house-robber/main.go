@@ -118,3 +118,29 @@ func robV2(nums []int) int {
 
 	return second
 }
+
+func robV3(nums []int) int {
+	dp := make([]int, len(nums)+1)
+
+	// 递推函数
+	// dp[i] = max(dp[i-1], dp[i-2]+nums[i])
+	if len(nums) == 1 {
+		return nums[0]
+	}
+
+	// 初始化
+	dp[1], dp[2] = nums[0], max(nums[0],nums[1])
+
+	for i := 3; i <= len(nums); i++ {
+		dp[i] = max(dp[i-1], dp[i-2]+nums[i-1])
+	}
+
+	return dp[len(nums)]
+}
+
+func max(x, y int) int {
+	if x > y {
+		return x
+	}
+	return y
+}
