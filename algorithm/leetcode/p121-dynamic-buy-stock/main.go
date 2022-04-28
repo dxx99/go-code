@@ -36,12 +36,63 @@ import "fmt"
 func main() {
 	fmt.Println(maxProfit([]int{7,1,5,3,6,4}))
 	fmt.Println(maxProfit([]int{7,6,4,3,1}))
+	fmt.Println(maxProfit([]int{2,1,2,1,0,1,2}))   // 2
 	fmt.Println("V2...............")
 	fmt.Println(maxProfitV2([]int{7,1,5,3,6,4}))
 	fmt.Println(maxProfitV2([]int{7,6,4,3,1}))
 	fmt.Println(maxProfitV2([]int{2,1,2,1,0,1,2}))   // 2
+	fmt.Println("V4...............")
+	fmt.Println(maxProfitV4([]int{7,1,5,3,6,4}))
+	fmt.Println(maxProfitV4([]int{7,6,4,3,1}))
+	fmt.Println(maxProfitV4([]int{2,1,2,1,0,1,2}))   // 2
 
 }
+
+// 双指针求解
+func maxProfitV4(prices []int) int {
+	max := 0
+	if len(prices) == 0 {
+		return max
+	}
+
+	left := 0
+	for right := 1; right < len(prices); right++ {
+		if prices[right] < prices[left] {
+			left = right
+			continue
+		}
+
+		 cur := prices[right] - prices[left]
+		if cur > max {
+			max = cur
+		}
+	}
+	return max
+}
+
+// 动规五部曲求解【求的累积最大值】
+func maxProfitV3(prices []int) int {
+	dp := make([]int, len(prices))
+
+	// 递推公式 dp[i] = dp[i-1] + profit(prices[i], prices[i-1])
+
+	// 初始化, 当天买卖没有收益
+	dp[0] = 0
+
+	//遍历
+	for i := 1; i < len(prices); i++ {
+		dp[i] = dp[i-1] + profit(prices[i], prices[i-1])
+	}
+	return dp[len(prices)-1]
+}
+
+func profit(x, y int) int {
+	if x > y {
+		return x-y
+	}
+	return 0
+}
+
 
 // 暴利解法，双循环
 func maxProfit(prices []int) int {
