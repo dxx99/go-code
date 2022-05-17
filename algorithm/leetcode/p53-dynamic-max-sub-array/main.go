@@ -40,6 +40,53 @@ func main() {
 	nums := []int{-2,1,-3,4,-1,2,1,-5,4}
 	fmt.Println(maxSubArray(nums))
 	fmt.Println(maxSubArrayV3(nums))
+	fmt.Println(maxSubArrayVdg(nums))
+	fmt.Println(maxSubArrayVtx(nums))
+}
+
+// 贪心算法
+// 如果当前元素的和大于零，则加上当前元素之后的和最大值
+// 如果当前元素的和小于零，则要丢弃当前元素的值
+func maxSubArrayVtx(nums []int) int {
+	sum, cur := nums[0], nums[0]
+
+	for i := 1; i < len(nums); i++ {
+		if cur < 0 {
+			cur = nums[i]
+		}else {
+			cur += nums[i]
+		}
+
+		if cur > sum {
+			sum = cur
+		}
+	}
+	return sum
+}
+
+func maxSubArrayVdg(nums []int) int {
+	m := math.MinInt
+	dp := make([]int, len(nums))
+
+	// 当前元素减一的和大于零
+	// dp[i] = max(dp[i-1], 0) + n
+
+	dp[0] = nums[0]
+	for i := 1; i < len(nums); i++ {
+		dp[i] = max(dp[i-1], 0) + nums[i]
+		// 存储最大值
+		if dp[i] > m {
+			m = dp[i]
+		}
+	}
+	return m
+}
+
+func max(x, y int) int {
+	if x > y {
+		return x
+	}
+	return y
 }
 
 func maxSubArray(nums []int) int {

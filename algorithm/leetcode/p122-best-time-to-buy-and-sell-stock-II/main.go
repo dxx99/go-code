@@ -47,6 +47,24 @@ func main() {
 	fmt.Println(maxProfitV2([]int{7,1,5,3,6,4}))
 	fmt.Println(maxProfitV2([]int{1,2,3,4,5}))
 	fmt.Println(maxProfitV2([]int{7,6,4,3,1}))
+
+	fmt.Println("V3------------------")
+	fmt.Println(maxProfitV3([]int{7,1,5,3,6,4}))
+	fmt.Println(maxProfitV3([]int{1,2,3,4,5}))
+	fmt.Println(maxProfitV3([]int{7,6,4,3,1}))
+}
+
+// 使用贪心算法求解
+func maxProfitV3(prices []int) int {
+	sum := 0
+
+	for i := 1; i < len(prices); i++ {
+		if prices[i] > prices[i-1] {
+			sum += prices[i] - prices[i-1]
+		}
+	}
+
+	return sum
 }
 
 // 动态规划求解
