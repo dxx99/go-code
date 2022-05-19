@@ -46,6 +46,38 @@ func main() {
 	fmt.Println(largestSumAfterKNegations([]int{4,2,3}, 1))
 	fmt.Println(largestSumAfterKNegations([]int{3,-1,0,2}, 3))
 	fmt.Println(largestSumAfterKNegations([]int{2,-3,-1,5,-4}, 2))
+
+
+	fmt.Println("v2----------------------")
+	fmt.Println(largestSumAfterKNegationsV2([]int{-2,-4,-3}, 4))
+	fmt.Println(largestSumAfterKNegationsV2([]int{-2,5,0,2,-2}, 3))
+	fmt.Println(largestSumAfterKNegationsV2([]int{-1,-3,-2,-6,-7}, 5))
+	fmt.Println(largestSumAfterKNegationsV2([]int{1,3,2,6,7,9}, 3))
+	fmt.Println(largestSumAfterKNegationsV2([]int{4,2,3}, 1))
+	fmt.Println(largestSumAfterKNegationsV2([]int{3,-1,0,2}, 3))
+	fmt.Println(largestSumAfterKNegationsV2([]int{2,-3,-1,5,-4}, 2))
+}
+
+func largestSumAfterKNegationsV2(nums []int, k int) int {
+	// 给数组的元素按绝对值逆序
+	sort.Slice(nums, func(i, j int) bool {
+		return math.Abs(float64(nums[i])) > math.Abs(float64(nums[j]))
+	})
+	for i := 0; i < len(nums); i++ {
+		if k > 0 && nums[i] < 0 {
+			nums[i] = -nums[i]
+			k--
+		}
+	}
+	if k % 2 == 1 {
+		nums[len(nums)-1] = -nums[len(nums)-1]
+	}
+
+	ans := 0
+	for _, num := range nums {
+		ans += num
+	}
+	return ans
 }
 
 // 贪心算法，将指针指向绝对值最小的元素
