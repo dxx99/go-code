@@ -42,6 +42,39 @@ func main() {
 	fmt.Println(maxProfit([]int{9,8,7,1,2}, 2))
 	fmt.Println(maxProfit([]int{1, 3, 2, 8, 4, 9}, 2))
 	fmt.Println(maxProfit([]int{1,3,7,5,10,3}, 3))
+
+	fmt.Println("V2-------------")
+	fmt.Println(maxProfitV2([]int{9,8,7,1,2}, 2))
+	fmt.Println(maxProfitV2([]int{1, 3, 2, 8, 4, 9}, 2))
+	fmt.Println(maxProfitV2([]int{1,3,7,5,10,3}, 3))
+}
+
+// 贪心算法
+// 情况一：收获利润的这一天并不是收获利润区间里的最后一天（不是真正的卖出，相当于持有股票），所以后面要继续收获利润。
+// 情况二：前一天是收获利润区间里的最后一天（相当于真正的卖出了），今天要重新记录最小价格了。
+// 情况三：不作操作，保持原有状态（买入，卖出，不买不卖）
+func maxProfitV2(prices []int, fee int) int {
+	ans := 0
+
+	// 先缩减数组大小，只记录拐点
+	minPrice := prices[0]
+	for i := 1; i < len(prices); i++ {
+		if prices[i] < minPrice {	// 情况二 这个相当于买入操作
+			minPrice = prices[i]
+		}
+
+		// 情况三, 保持原操作，不作交易
+		if prices[i] >= minPrice && prices[i] <= minPrice + fee {
+			continue
+		}
+
+		// 情况一： 可能多次计算利润，但是最后一次才是真正的利润
+		if prices[i] > minPrice + fee {
+			ans += prices[i] - minPrice - fee
+			minPrice = prices[i] - fee	// 神来之笔
+		}
+	}
+	return ans
 }
 
 func maxProfit(prices []int, fee int) int {
