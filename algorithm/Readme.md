@@ -88,6 +88,30 @@ func traverse(head *ListNode){
 ![](./png/tree_before_mid_back.jpg)
 
 
+### 单调栈
+**递增模板**
+```go
+func sigleStack(nums []int) {
+	stack := make([]int, 0)
+	for i:=0; i< len(nums); i++ {
+	    if len(stack) == 0 || stack[len(stack)-1] > nums[i] {
+		    stack = append(stack, nums[i])	
+        }else{
+		    for len(stack) != 0 && stack[len(stack)-1] <= nums[i]{
+			    stack = stack[:len(stack)-1]	
+            }
+			stack = append(stack, nums[i])
+        }   	
+    }
+}
+```
+
+**场景**
+- 一组数组，要寻找任一个元素的右边或者左边第一个比自己大或者小的元素的位置，此时我们就想到用单调栈
+
+**注意点**
+- 单调栈存放的元素是什么？（只需要下标就可以了）
+- 单调栈的元素是递增？还是递减？（顺序是指栈头到栈底的顺序）
 
 
 ## 动画网站
