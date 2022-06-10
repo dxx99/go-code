@@ -51,7 +51,7 @@ func main() {
 	root.Right.Right.Right = NewNode(1)
 
 
-	fmt.Println(pathSum(root, 22))
+	fmt.Println(pathSumV2(root, 22))
 }
 
 /**
@@ -75,6 +75,33 @@ func NewNode(val int) *TreeNode {
 		Left:  nil,
 		Right: nil,
 	}
+}
+
+func pathSumV2(root *TreeNode, targetSum int) [][]int {
+	ans := make([][]int, 0)
+	track := make([]int, 0)
+	var helper func(*TreeNode, int)
+	helper = func(node *TreeNode, sum int) {
+		if node == nil {
+			return
+		}
+
+		sum -= node.Val
+		track = append(track, node.Val)
+		defer func() {track = track[:len(track)-1]}()	// 回溯操作
+
+		if node.Left == nil && node.Right == nil && sum == 0 {
+			tmp := make([]int, len(track))	// 回溯数组存储，要copy
+			copy(tmp, track)
+			ans = append(ans, tmp)
+			return
+		}
+
+		helper(node.Left, sum)
+		helper(node.Right, sum)
+	}
+	helper(root, targetSum)
+	return ans
 }
 
 

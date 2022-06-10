@@ -223,3 +223,134 @@ func findBottomLeftValueV2(root *TreeNode) int {
 	return ans
 }
 
+// 112. 路径总和
+// https://leetcode.cn/problems/path-sum/
+func hasPathSum(root *TreeNode, targetSum int) bool {
+	if root == nil {
+		return false
+	}
+
+	cur := root.Val
+	var helper func(node *TreeNode) bool
+	helper = func(node *TreeNode) bool {
+		if node.Left == nil && node.Right == nil && cur == targetSum {
+			return true
+		}
+		if node.Left != nil {
+			cur += node.Left.Val
+			leftRes := helper(node.Left)
+			if leftRes {
+				return true
+			}
+			cur -= node.Left.Val	//回溯逻辑
+
+		}
+		if node.Right != nil {
+			cur += node.Right.Val
+			rightRes := helper(node.Right)
+			if rightRes {
+				return true
+			}
+			cur -= node.Right.Val
+		}
+		return false
+	}
+	return helper(root)
+}
+// 优化递归代码
+func hasPathSumV2(root *TreeNode, targetSum int) bool {
+	if root == nil {
+		return false
+	}
+	if root.Left == nil && root.Right == nil && targetSum == root.Val {
+		return true
+	}
+	return hasPathSumV2(root.Left, targetSum - root.Val) || hasPathSumV2(root.Right, targetSum-root.Val)
+}
+
+
+// 113. 路径总和 II
+// https://leetcode.cn/problems/path-sum-ii/
+func pathSum(root *TreeNode, targetSum int) [][]int {
+	ans := make([][]int, 0)
+	if root == nil {
+		return ans
+	}
+
+	track := make([]int, 0)
+	var helper func(node *TreeNode, sum int)
+	helper = func(node *TreeNode, sum int) {
+		if node.Left == nil && node.Right == nil && sum == 0 {
+			tmp := make([]int, len(track))	// 回溯数组存储，要copy
+			copy(tmp, track)
+			ans = append(ans, tmp)
+			return
+		}
+
+		if node.Left != nil {
+			track = append(track, node.Left.Val)
+			helper(node.Left, sum - node.Left.Val)
+			track = track[:len(track)-1]	// 回溯操作
+		}
+
+		if node.Right != nil {
+			track = append(track, node.Right.Val)
+			helper(node.Right, sum - node.Right.Val)
+			track = track[:len(track)-1]
+		}
+	}
+	track = append(track, root.Val)
+	helper(root, targetSum - root.Val)
+	return ans
+}
+// 代码优化
+func pathSumV2(root *TreeNode, targetSum int) [][]int {
+	ans := make([][]int, 0)
+	track := make([]int, 0)
+	var helper func(*TreeNode, int)
+	helper = func(node *TreeNode, sum int) {
+		if node == nil {
+			return
+		}
+
+		sum -= node.Val
+		track = append(track, node.Val)
+		defer func() {track = track[:len(track)-1]}()	// 回溯操作
+
+		if node.Left == nil && node.Right == nil && sum == 0 {
+			tmp := make([]int, len(track))	// 回溯数组存储，要copy
+			copy(tmp, track)
+			ans = append(ans, tmp)
+			return
+		}
+
+		helper(node.Left, sum)
+		helper(node.Right, sum)
+	}
+	helper(root, targetSum)
+	return ans
+}
+
+func pathSumV3(root *TreeNode, targetSum int) (ans [][]int) {
+	path := []int{}
+	var dfs func(*TreeNode, int)
+	dfs = func(node *TreeNode, left int) {
+		if node == nil {
+			return
+		}
+		left -= node.Val
+		path = append(path, node.Val)
+		defer func() { path = path[:len(path)-1] }()
+		if node.Left == nil && node.Right == nil && left == 0 {
+			tmp := make([]int, len(path))	// 回溯数组存储，要copy
+			copy(tmp, path)
+			ans = append(ans, tmp)
+			return
+		}
+		dfs(node.Left, left)
+		dfs(node.Right, left)
+	}
+	dfs(root, targetSum)
+	return
+}
+
