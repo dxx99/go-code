@@ -1,6 +1,5 @@
 package main
 
-
 func main() {
 
 }
@@ -155,5 +154,35 @@ func endOrderTraversalV2(root *TreeNode) []int {
 		}
 	}
 	reverse(ans)
+	return ans
+}
+
+// bfs 广度优先搜索
+// 层序遍历
+func leverOrder(root *TreeNode) []int {
+	queue := make([]*TreeNode, 0)
+	ans := make([]int, 0)
+	if root == nil {
+		return ans
+	}
+
+	for len(queue) != 0 {
+		newQueue := make([]*TreeNode, 0)
+		for i := 0; i < len(queue); i++ {
+			node := queue[i]
+			ans = append(ans, node.Val)
+
+			if node.Left != nil {
+				newQueue = append(newQueue, node.Left)
+			}
+			if node.Right != nil {
+				newQueue = append(newQueue, node.Right)
+			}
+		}
+
+		// 队列替换
+		queue = newQueue
+	}
+
 	return ans
 }
