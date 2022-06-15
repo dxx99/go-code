@@ -199,3 +199,18 @@ func trimBST(root *TreeNode, low int, high int) *TreeNode {
 	root.Right = trimBST(root.Right, low, high)
 	return root
 }
+
+// 108. 将有序数组转换为二叉搜索树
+// https://leetcode.cn/problems/convert-sorted-array-to-binary-search-tree/
+func sortedArrayToBST(nums []int) *TreeNode {
+	mid := len(nums)>>1
+	if len(nums) == 0 {
+		return nil
+	}
+	root := &TreeNode{Val: nums[mid]}
+	root.Left = sortedArrayToBST(nums[:mid])
+	root.Right = sortedArrayToBST(nums[mid+1:])
+	return root
+}
+
+//
