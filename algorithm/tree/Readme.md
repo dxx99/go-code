@@ -65,7 +65,14 @@ if leftHeight == rightHeight {
 	//todo
 }
 ```
-#### 5. 什么时候需要返回值
+#### 5. 如何构建二叉树
+```go
+// 1. 先找到根节点
+// 2. 再递归左边
+// 3. 递归右边
+// 4. 返回根节点
+```
+#### 6. 什么时候需要返回值
 - 如果需要遍历整棵树，递归函数就不能有返回值
 - 如果需要遍历某一条固定路线，递归函数就一定要有返回值
 
@@ -93,4 +100,23 @@ if leftHeight == rightHeight {
 - [513. 找树左下角的值](https://leetcode.cn/problems/find-bottom-left-tree-value/)
 - [112. 路径总和](https://leetcode.cn/problems/path-sum/)
 - [113. 路径总和 II](https://leetcode.cn/problems/path-sum-ii/)
-- 
+
+### [二叉树构建](./二叉树构建/main.go)
+- [106. 从中序与后序遍历序列构造二叉树](https://leetcode.cn/problems/construct-binary-tree-from-inorder-and-postorder-traversal/)
+- [105. 从前序与中序遍历序列构造二叉树](https://leetcode.cn/problems/construct-binary-tree-from-preorder-and-inorder-traversal/)
+- [654. 最大二叉树](https://leetcode.cn/problems/maximum-binary-tree/)
+- [617.合并二叉树](https://leetcode.cn/problems/merge-two-binary-trees/)
+
+### [二叉搜索树](./二叉搜索树/main.go)
+- [700. 二叉搜索树中的搜索](https://leetcode.cn/problems/search-in-a-binary-search-tree/)
+- [98. 验证二叉搜索树](https://leetcode.cn/problems/validate-binary-search-tree/)
+- [530. 二叉搜索树的最小绝对差](https://leetcode.cn/problems/minimum-absolute-difference-in-bst/)
+- [501. 二叉搜索树中的众数](https://leetcode.cn/problems/find-mode-in-binary-search-tree/)
+- [701. 二叉搜索树中的插入操作](https://leetcode.cn/problems/insert-into-a-binary-search-tree/)
+- [450. 删除二叉搜索树中的节点](https://leetcode.cn/problems/delete-node-in-a-bst/)
+- [669. 修剪二叉搜索树](https://leetcode.cn/problems/trim-a-binary-search-tree/)
+
+
+### [二叉树公共祖先问题](./二叉树公共祖先问题/main.go)
+- [236. 二叉树的最近公共祖先](https://leetcode.cn/problems/lowest-common-ancestor-of-a-binary-tree/)
+- [235. 二叉搜索树的最近公共祖先](https://leetcode.cn/problems/lowest-common-ancestor-of-a-binary-search-tree/)

@@ -331,26 +331,5 @@ func pathSumV2(root *TreeNode, targetSum int) [][]int {
 	return ans
 }
 
-func pathSumV3(root *TreeNode, targetSum int) (ans [][]int) {
-	path := []int{}
-	var dfs func(*TreeNode, int)
-	dfs = func(node *TreeNode, left int) {
-		if node == nil {
-			return
-		}
-		left -= node.Val
-		path = append(path, node.Val)
-		defer func() { path = path[:len(path)-1] }()
-		if node.Left == nil && node.Right == nil && left == 0 {
-			tmp := make([]int, len(path))	// 回溯数组存储，要copy
-			copy(tmp, path)
-			ans = append(ans, tmp)
-			return
-		}
-		dfs(node.Left, left)
-		dfs(node.Right, left)
-	}
-	dfs(root, targetSum)
-	return
-}
+
 
