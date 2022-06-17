@@ -213,4 +213,21 @@ func sortedArrayToBST(nums []int) *TreeNode {
 	return root
 }
 
-//
+// 538. 把二叉搜索树转换为累加树
+// https://leetcode.cn/problems/convert-bst-to-greater-tree/
+func convertBST(root *TreeNode) *TreeNode {
+	pre := 0
+	var helper func(node *TreeNode)
+	helper = func(node *TreeNode) {
+		if node == nil {
+			return
+		}
+		helper(node.Right)
+		node.Val += pre		// 中序遍历，记录前面的值，方便做累加
+		pre = node.Val
+		helper(node.Left)
+	}
+
+	helper(root)
+	return root
+}

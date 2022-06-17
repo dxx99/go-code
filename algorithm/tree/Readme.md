@@ -77,6 +77,9 @@ if leftHeight == rightHeight {
 - 如果需要遍历某一条固定路线，递归函数就一定要有返回值
 
 
+### 二叉树总结
+![](./images/二叉树.png)
+
 
 ### [LeetCode二叉树层序遍历](./力扣层序遍历/main.go)
 - [102.二叉树的层序遍历](https://leetcode.cn/problems/binary-tree-level-order-traversal/)
@@ -116,6 +119,7 @@ if leftHeight == rightHeight {
 - [450. 删除二叉搜索树中的节点](https://leetcode.cn/problems/delete-node-in-a-bst/)
 - [669. 修剪二叉搜索树](https://leetcode.cn/problems/trim-a-binary-search-tree/)
 - [108. 将有序数组转换为二叉搜索树](https://leetcode.cn/problems/convert-sorted-array-to-binary-search-tree/)
+- [538. 把二叉搜索树转换为累加树](https://leetcode.cn/problems/convert-bst-to-greater-tree/)
 
 
 ### [二叉树公共祖先问题](./二叉树公共祖先问题/main.go)
