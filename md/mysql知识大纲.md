@@ -8,7 +8,7 @@
 #### 1.1.1 连接器
 - tcp连接之后，在进行用户账号密码权限认证，通过之后在权限表中查出所有权限
 - 之后这个连接里面的权限判断逻辑，都依赖此时读到的权限。(修改权限，原来的连接权限不变)
-- 空闲连接啥时候被回收(show variables like '%wait_timeout%') 单位秒，默认8小时
+- 空闲连接啥时候被回收 `show variables like '%wait_timeout%'` 单位秒，默认8小时
 
 **怎么解决长连接导致内存占用过大问题**  
 - 定期断开连接
@@ -48,7 +48,7 @@
 
 #### 1.2.2 重要的日志模块：binlog
 - 为归档日志，在server层做记录，没有crash-safe能力
-- 数据更新执行器流程
+- 数据更新执行器流程  
 ![](./images/mysql/数据更新执行器流程.png)
 
 **思考？**
@@ -91,7 +91,7 @@
   - 可重复读(repeatable read) 视图(在sql语句执行时创建) 事务在整个执行的过程中前后看到的数据是一致的
   - 串行化(serializable)   加锁
 - 如何查看事务的隔离级别
-  - show variables like 'transaction-isolation';
+  - `show variables like 'transaction-isolation';`
 - RR级别的隔离如何解决幻读
   - 添加排他锁 for update
   - 使用可串行化(serializable)
@@ -105,11 +105,14 @@
 - rollback
 - commit
 - set autocommit=0 关闭自动提交事务，减少显示设置开启事务
+- 修改事务的隔离级别
+  - `set global transaction isolation level read committed;`
+  - 或者通过修改配置
 
 #### 1.3.3 事务到底是隔离还是不隔离？
-- begin/start transaction并不是事务的起点，一致性快照的起点
+- `begin/start transaction` 并不是事务的起点，一致性快照的起点
   - 一致性快照是在执行第一个快照读语句创建
-  - 一致性快照是在执行start transaction with consistent snapshot
+  - 一致性快照是在执行`start transaction with consistent snapshot`
 - 在mysql有"两个"视图的概念
   - 一个是view, 通过create view....
   - 一个是MVCC的一致性读视图，consistent read view，用在RC、RR隔离中实现
@@ -129,6 +132,15 @@
 - 一个事务启动时，能够看到所有已提交的事务结果，但是之后，在执行期间，其实事务的更新对它不可见
 - 事务执行之后，其他事务的更新对它虽然不可见，但是数据版本还是可见的，因为数据库实际上存储的是最新版本的数据。但是对于该事务来说，需要根据版本号以及Undo Logs计算出他需要的版本对应的数据
 
+**事务的可重复读能力是怎么实现的？**
+- 核心是一致性读（consistent read）
+- 事务更新数据的时候只能用*当前读*
+- 如果当前事物的行锁被其他事务占用的话，就需要进入锁等待
+
+**读提交与可重复读的逻辑类似，主要区别**
+- 可重复读隔离级别下，只需要在事务开始时候创建一致性视图，之后事务里的其他查询都共用这个一致性视图
+- 在读提交的隔离级别下，每一条语句执行都会重新算出一个新的视图
+
 **思考**
 - 回滚日志什么时候删除?
   - 系统中没有比回滚日志更早的日志就可以删除原因，因为read-view在commit之后就会被删掉
@@ -146,6 +158,8 @@
     - 监控information_schema.INNODB_TRX的表的数据，设置报警，超时kill动作
     - 利用pt-kill工具监控长事务
     - 保证undo log表空间足够
+- 为啥表结构没有可重复读？
+  - 因为表结构没有对应的行数据，也没有row trx_id,因此只能遵循当前的读逻辑
 
 ### 1.4 深入浅出索引
 - 索引的目的是为了提高数据的查询效率
@@ -171,7 +185,7 @@
 #### 1.4.3 索引维护
 - 维护索引数据的有序性
   - 在插入的时候需要进行维护，推荐使用自增主键，好处是每次插入数据追加，不必需要数据移动
-  - 自增主键 not null primary key auto_increment
+  - 自增主键 `not null primary key auto_increment`
 - 业务字段做主键问题
   - 逻辑的字段不容易保证数据的自增，这样写数据成本相对高一点
   - 如果字段大小控制不好，导致二级索引需要占用更多的额外空间
@@ -181,7 +195,7 @@
   - 相连的两个页由于数据的删除，导致空间利用率很低，会进行页的合并
 
 #### 1.4.4 经典范围查询如果做回表
-- select * from t1 where k between 3 and 5
+- `select * from t1 where k between 3 and 5`
   - 先找k索引树上的3，通过Id进行回表
   - 再顺序访问k上的4，通过ID进行回表
   - 再顺序访问k上的5，通过ID进行回表
@@ -214,13 +228,13 @@
 
 #### 1.5.1 全局锁
 - 对数据库整个实例加锁
-  - flush tables with read lock (让数据库只读)
-  - unlock tables (解除数据库的全局锁)
+  - `flush tables with read lock` (让数据库只读)
+  - `unlock tables` (解除数据库的全局锁)
   - 应用场景，坐全库逻辑备份
 - 官方的mysqldump对数据进行备份，如何保证数据的一致性
   - 导数据之前，会启用一个事务，来确保拿到数据的一致性视图
   - 为啥还需要FTWRL, 因为并不是所有的引擎都支持
-- 为啥不使用set global readonly=true来设置只读
+- 为啥不使用 `set global readonly=true` 来设置只读
   - readonly有可能用到其他业务，比如主从
   - 客户端异常断开，FTWRL会释放锁，但是readonly不会，所以风险更高
 
@@ -238,7 +252,7 @@
   - MDL锁只有在事务提交的时候才释放，要小心防止锁住线上数据
 - 如何给你查询频繁的表添加字段
   - 防止阻塞，添加等待时间，如果在规定的时间还没拿到锁就放弃，后面再重试
-  - alter table t1 nowait/wait n add column
+  - `alter table t1 nowait/wait n add column`
 
 #### 1.5.3 行级锁
 - 是有引擎自己实现了，并不是所有引擎都支持，MyiSAM就不支持行锁
@@ -263,3 +277,268 @@
 - 关闭死锁检测（风险：大量超时）
 - 做并发控制
 - 优化业务逻辑
+
+
+## 2. 实战篇
+### 2.1 普通索引与唯一索引的选择？
+#### 2.1.1 查询过程
+- 以如下语句进行优化
+`select * from t where k = 5;`
+
+**普通索引**
+- 先通过普通索引k查找到满足k=5的记录，然后再去判断下一条记录是否满足k=5, 然后回表查询记录
+- 由于innodb的最小单位是page, 默认大小为16kb, 所以下一条记录的判断绝大多的时候不需再次进行磁盘Io, 除非分页
+
+**唯一索引**
+- 由于唯一索引的唯一性，查询到唯一满足条件的时候就会停止检索，然后回表查询到对应记录
+- 因为唯一索引比普通索引查询性能好一丢丢。理论上cpu的操作性能损耗应忽略
+
+#### 2.1.2 change buffer(可以持久化数据)
+- 当需要数据更新的时候
+  - 如果数据在内存中，直接更新
+  - 如果不在内存中，在不影响一致性的前提，更新操作会缓存再change buffer中，这样就不需要从磁盘中读取数据
+- 在下次访问数据页的时候(merge操作)
+  - 将数据缓存到内存中，然后执行change buffer中与这个页的操作，更新内存中的数据
+- 什么情况下会触发merge操作(将change buffer的数据应用到原始数据页)
+  - 读操作
+  - 后台线程定期merge
+  - 数据库的正常关闭
+- change buffer主要为了解决什么问题
+  - 减少读磁盘(随机读)
+- 什么情况下可以使用change buffer?
+  - 由于唯一索引必须判断这个k=4这条记录否是存在索引中，所以必须先将数据读入到内存中。因为唯一索引不能使用change buffer
+  - 普通索引可以使用change buffer
+
+#### 2.1.3 思考题？
+- 某次写使用了change buffer机制，之后主机异常，是否会造成change buffer数据丢失？
+  - 不会丢失
+  - 虽然只更新内存，但在事务提交的时候，change buffer记录在redo log
+  - 系统恢复会通过redo log恢复change buffer的数据
+- merge的执行流程如何？会把数据写回磁盘？
+  - 从磁盘中读入数据页到内存(老版本的数据页)
+  - 从change buffer里找到这个数据页的change buffer记录(可能多条)，依次执行，得到新的数据页
+  - 写入redo log, 这个redo log包含了数据的变更和change buffer记录的变更。
+  - merge就执行完成了，因此merge不会写入磁盘，写入磁盘是脏页的刷新逻辑
+
+
+### 2.2 mysql为什么会选错索引
+#### 2.2.1 索引选择的工作原理
+- 优化器选择索引的逻辑
+  - 扫描的行数(扫描行数越少->访问磁盘越少->消耗cpu越少)
+    - 根据统计信息估算记录数，也就是"区分度"，不同的值越多，区分度越高
+    - 查看索引的基数 `show index from t4;` "cardinality"
+    - 通过采样统计来确定
+      - 默认选择N页，统计不同值，得到平均値，然后再乘以索引的页面数，这样就可以得到索引的基数
+      - 当变更的数超过 1/M 页的时候，会触发重新做一次索引统计
+    - 两种存储索引统计的方式，通过innodb_stats_persistent来设置
+      - on 表示统计信息回持久化存储，默认N=20,M=10
+      - off 表示统计信息只存储在内存中，默认N=8,M=16
+  - 优化器还要考虑索引回表查询的代价
+    - `analyze table t4` 可以用来重新统计索引信息
+  - 是否使用临时表(内存不够，使用基于磁盘的临时表)
+    - union查询
+    - order by 与 group by的子句不一样时
+    - distinct查询并加上order by时
+    - 子查询
+  - 是否进行排序
+    - `explain select * from t4 where a between 1 and 1000 and b between 50000 and 100000 order by b limit 1;` 使用索引b, 而不是索引a
+    - 因为使用索引a, 优化器会认为使用文件排序需要额外的消耗，所以选错索引
+
+#### 2.2.2 索引选错异常处理
+- 使用force index 强行选择索引
+  - `explain select * from t4 force index(a) where a between 1 and 1000 and b between 50000 and 100000 order by b limit 1;`
+  - 不够优美，变更索引名需要调整等问题
+- 修改sql, 使其命中我们期望的索引
+  - `explain select * from t4 where a between 1 and 1000 and b between 50000 and 100000 order by b,a limit 1;`
+  - 调整 order by 使其选择任何一个索引都需要排序
+  - `explain select * from  (select * from t4 where (a between 1 and 1000)  and (b between 50000 and 100000) order by b limit 100)alias limit 1;`
+  - 诱导编译器选择索引b代价很高
+- 新建更适合的索引，来提供给优化器做选择，或删掉误用的索引
+  - 删掉不合适的索引
+  - 建立联合索引避免回表查询等
+
+### 2.3 怎么给字段添加索引
+- 使用索引的原则
+  - 区分度越高越好，因为高区分度，意味着复用的键值越少
+- 索引创建的使用场景
+  - 直接创建完整索引，要注意空间的占用情况
+  - 前缀索引，节省空间，但会增加查询扫描次数，并且不能使用索引覆盖
+  - 倒叙索引，可以解决前缀索引区分度不够问题，不支撑范围查询
+  - hash索引，查询性能稳定，需要额外的存储和计算消耗，不支持范围查询
+
+### 2.4 为什么我们的mysql会"抖"一下
+#### 2.4.1 脏页的概念
+- 脏页/干净页的理解
+  - 当内存数据页跟磁盘数据页内容不一至的时候，我们称这个内存页为"脏页"
+  - 内存数据写入磁盘后，内存和磁盘上的数据页的内容就一致，我们称"干净页"
+  - 脏页与干净页都在内存中
+- innodb在什么情况下，会触发刷脏(flush)过程？
+  - redo log写满了(停止更新操作，checkpoint往前推进，redo log留出空间)
+  - 系统内存不足，需要淘汰脏页
+  - 系统空闲，触发刷脏
+  - 系统正常关闭，触发刷脏
+
+#### 2.4.2 刷脏对系统性能的影响
+- 明显影响性能的情况？
+  - redo log写满，更新全部堵住，写性能为零，对敏感性业务不能接受
+  - 一个查询淘汰的脏页个数太多，会导致查询的响应时间明显变长
+- 缓冲池中内存的三种状态
+  - 没有使用
+  - 使用了的干净页
+  - 使用了的脏页
+- 读取申请内存不够的淘汰策略
+  - 先淘汰最久不使用的数据页从内存中淘汰
+  - 如果是干净页直接释放复用，如果是脏页，必须先将脏页刷磁盘变成干净页之后再复用
+  
+#### 2.4.3 innodb刷脏的控制策略
+- `show variables like '%innodb_io_capacity%'`
+  - innodb_io_capacity表示磁盘的能力，建议设置成磁盘的iops
+- innodb刷盘速度参考因素
+  - 刷脏比例 `innodb_max_dirty_pages_pct` 默认75%
+  - redo log写盘熟读
+- 查看innodb的脏比
+  - `select VARIABLE_VALUE into @a from performance_schema.global_status where VARIABLE_NAME = 'Innodb_buffer_pool_pages_dirty'; select VARIABLE_VALUE into @b from performance_schema.global_status where VARIABLE_NAME = 'Innodb_buffer_pool_pages_total'; select @a/@b;`
+- innodb连刷机制
+  - `show variables like '%innodb_flush_neighbors%';`
+  - 会让查询抖动更大，现在磁盘io增大，建议关闭这个
+- WAL技术
+  - 将数据库的随机写转成顺序写，大大提升数据库性能
+
+### 2.5 为什么表数据删除一半，表文件不变
+#### 2.5.1 表结构的定义与数据存储
+- mysql的innodb表包含部分
+  - 表结构定义(8.0可以把表结构定义放在系统数据表中)
+  - 数据
+- innodb_file_per_table用来控制表数据存在共享表空间，也可以单独的文件
+  - OFF表示，表数据放在系统共享表空间，也就是跟数据字典放一起
+  - ON表示，每个Innodb表数据存储在一个.idb为后缀的文件（建议）
+    - 独立在删除 drop table命令之后，系统可以直接删除文件，空间得到释放
+
+#### 2.5.2 数据删除的执行流程
+- 如果删掉一条记录R4
+  - 会标记这个位置为删除，但磁盘文件的大小并不缩小
+  - 如果后面插入的记录会在R4这个位置，会复用这个位置
+- 如果删掉整个数据页上的所有记录
+  - 这样整个数据页就可以被复用
+  - 数据页复用跟记录复用不同，整个页复用可以存储到任何位置
+- 相邻两个数据页利用率，页合并操作
+  - 系统会将两个页的数据合并到一个也上，另外一个页就被标记为可复用
+- 如果使用delete删除数据
+  - 所有的页被标记为可复用，但磁盘上文件大小不变
+  - 也就是说delete不会回收磁盘空间
+  - 实际上不止删除数据会造成空洞，插入数据也会（随机的插入，就可能造成索引数据的分裂）
+
+#### 2.5.3 如何解决磁盘不回收的问题？
+- 重建表
+  - `alter table A engine=Innodb`
+  - mysql会自动完成转存数据，交换表名，删除旧表的操作
+- 重建表的时候，往临时表插入数据，旧表又有数据写入如何解决？
+  - mysql5.6 引入 online DDL
+  - 建立一个临时文件，扫描表 A 主键的所有数据页；
+  - 用数据页中表 A 的记录生成 B+ 树，存储到临时文件中；
+  - 生成临时文件的过程中，将所有对 A 的操作记录在一个日志文件（row log）中，对应的是图中 state2 的状态；
+  - 临时文件生成后，将日志文件中的操作应用到临时文件，得到一个逻辑数据上与表 A 相同的数据文件，对应的就是图中 state3 的状态；
+  - 用临时文件替换表 A 的数据文件。
+  - 由于日志文件的记录和重放操作功能的存在，在重建表的时候，允许对表A做增删改操作
+  - 注意：会消耗IO和cpu资源
+  
+#### 2.5.4 online与inplace的区别
+- tmp_table是由server创建的,`alter table t engine=innodb,ALGORITHM=copy;`
+- tmp_file 是由innodb创建的，整个ddl都在innodb内部完成，是一种原地操作
+- tmp_file `alter table t engine=innodb,ALGORITHM=inplace;`
+- 给innodb添加全文索引字段过程
+  - `alter table t add fulltext(file_name);`
+  - 这个过程是inplace,但会阻塞增删改操作，非online
+  - ddl过程如果是online, 则一点是inplace
+  - 反之来未必，添加全文索引(fulltext index) 和 空间索引(spatial index)就属于这种情况
+
+#### 2.5.5 optimize table / analyze table / alter table / truncate区别
+- alter table 是recreate table操作
+- analyze table 不是重建建表，只是对索引信息做重新的统计，没有修改数据，这个过程中加MDL读锁
+- optimize table 等于 recreate + analyze
+- truncate table 等于 drop + create
+
+#### 2.5.6 思考题？
+- 进行收缩表，结果占用空间更大
+  - 本来很紧凑
+  - 重新收缩，15/16整理数据，1/16留给update
+  - 未整理之前的页已经占用了90%以上，收缩后，文件反而变大
+
+
+### 2.7 count(*)这么慢，如何优化？
+#### 2.7.1 count(*)实现方式
+- innodb与myisam实现的原理
+  - innodb 需要把数据一行一行地从引擎里面读出来，然后累积记数
+  - Myisam引擎把表的总行数存在磁盘上
+    - 每次直接返回，效率高，但这是没有过滤条件的count(*)
+  - innodb引擎为什么不存储多少行数据，方便查询
+    - 由于多版本并发控制(MVCC)的原因，Innodb也不知道返回多少行
+    - 在事务的多个版本读取的行数不同
+- innodb扫描行的优化
+  - 扫描主键索引与其他索引一样，因此会选择扫描最小那棵树来遍历
+  - 在保证逻辑正确的前提下，尽量减少扫描的数据量，是数据库系统设计的通用法则之一。
+- `show table status` 的行数是估算出来的
+  - 误差40%-50%
+  - 不能直接替换扫描的行数
+
+#### 2.7.2 经常使用count(*)如何优化
+- 思路： 找一个地方，记录表的行数
+  - redis缓存起来
+    - 丢失，
+    - 并发数据不精准，并发系统无法控制不同线程执行时刻
+  - 找一个额外表存储起来
+    - 解决丢失问题
+    - 事务隔离的可视性问题
+
+#### 2.7.3 不同的count逻辑不同问题
+- count(*)、count(主键)、count(1)表示返回满足条件的结果集总行数
+- count(字段)，表示满足条件，参数"字段"不为null的总个数
+- 执行效率
+  - count(字段)<count(主键id)<count(1)<count(*)
+  - count(主键id)需要解析id, 然后判断null, 再累加
+  - count(1) 不需要解析，只需判断行不为null，然后累积
+  - count(*) mysql进行优化，认为一定非空，直接按行累积
+
+#### 2.7.5 思考题？从并发性能来看，先插入操作记录还是先更新计数表
+- 先插入记录，再更新计数统计表
+- 更新统计表涉及到行数，先插入再更新能最大程度减少事务之间的锁等待，提高并发度
+
+
+### 2.8 日志与索引的相关问题
+- mysql修改操作redo log 与 binlog的二阶段提交[1.2.3]
+
+#### 2.8.1 追问二阶段提交
+- mysql怎么知道binlog是完整的
+  - statement格式的binlog, 最后有一个commit
+  - row格式的binlog, 最后会有一个xid event
+- redo log 与 binlog是怎么串联起来的
+  - 通过一个共同的字段 xid
+  - 崩溃恢复的时候，会按顺序扫描redo log
+  - 如果碰到有prepare、commit的redo log直接提交
+  - 如果只有prepare, 没有commit的redo log, 会拿着xid去binlog找对应事务
+- 处于 prepare 阶段的 redo log 加上完整 binlog，重启就能恢复，MySQL 为什么要这么设计?
+  - 这个策略会 解决主从和备份数据的一致性问题，因为这些操作依赖binlog
+  - 需要保证binlog的完整性
+- 为什么需要二阶段提交？干脆先 redo log 写完，再写 binlog。崩溃恢复的时候，必须得两个日志都完整才可以。是不是一样的逻辑？
+  - 二阶段提交是经典的分布式系统的问题
+  - 如果直接写redo log, binlog失败，redo log又不能回滚，会造成数据的不一致性
+- 只保留binlog可以吗？
+  - 不能支持崩溃恢复
+- 只有redo log可以吗？
+  - 不可以，redo log是一个循环写，会覆盖原来的记录
+  - 没办法起到归档作用
+  - mysql系统的高可用就是binlog的复用
+- redo log一般要设置多大？
+  - 太小，很容易写满，不能不强刷redo log, wal技术发挥不出来
+- 正常运行中的实例，数据写入后的最终落盘，是从 redo log 更新过来的还是从 buffer pool 更新过来的呢？
+  - redo log并没有记录数据页的完整数据，没有能力更新数据磁盘页
+  - 脏页的刷新跟redo log没有关系
+  - 崩溃恢复的时候，脏页会丢失，会先将数据读到内存，然后用redo log更新为脏页
+- redo log buffer 是什么？是先修改内存，还是先写 redo log 文件？
+  - redo log buffer是一个内存，先保存redo日志
+  - 真正的日志是redo log file(文件名ib_logfile+数字)，是在commit语句的时候做的
+  - 事务在执行的过程中不会主动刷盘，用来减少io的消耗
+
+#### 2.8.2 思考题，跟新一条相同的数据，mysql如何处理？
+- InnoDB 认真执行了“把这个值修改成 (1,2)"这个操作，该加锁的加锁，该更新的更新。
+- 主要是事务的隔离性
