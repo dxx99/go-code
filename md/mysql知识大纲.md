@@ -93,7 +93,7 @@
 - 如何查看事务的隔离级别
   - `show variables like 'transaction-isolation';`
 - RR级别的隔离如何解决幻读
-  - 添加排他锁 for update
+  - `for update` 添加排他锁，当前读，也就是写锁
   - 使用可串行化(serializable)
 
 #### 1.3.1 事务隔离级别的实现
@@ -542,3 +542,334 @@
 #### 2.8.2 思考题，跟新一条相同的数据，mysql如何处理？
 - InnoDB 认真执行了“把这个值修改成 (1,2)"这个操作，该加锁的加锁，该更新的更新。
 - 主要是事务的隔离性
+
+
+### 2.9 order by的工作原理
+- 全字段排序
+- rowid排序
+
+#### 2.9.1 全字段排序
+- `select name,city,age from t5 where city="hangzhou" order by name limit 100`的执行流程
+  - 初始化sort_buffer,确定放入name,city,age这三个字段
+  - 从索引city找到对应的主键id
+  - 到主键id索引回表查询数据，取name,city,age三个字段，存储到sort_buffer
+  - 重复执行索引city, 主键id回表查询
+  - 对sort_buffer进行快速排序【可能在内存】
+  - 按排序的结果取100行返回给客户端
+- sort_buffer
+  - sort_buffer【是mysql为每个线程分配一块内存用于排序】
+  - 通过 `show variables like '%sort_buffer_size%';`
+  - 如果排序的数据量太大，内存放不下，就会利用磁盘临时文件辅助排序
+- 怎么判断排序是否使用了临时文件
+  - number_of_tmp_files 超过需求排序的数据量的大小
+  - sort_buffer_size 越小，需要分成的份数越多，number_of_tmp_files 的值就越大。
+
+#### 2.9.2 rowid排序
+- 单行数据很大，返回的数据量很大，一直使用临时文件，
+- mysql对单行长度太大的优化
+  - 初始化 sort_buffer，确定放入两个字段，即 name 和 id；
+  - 从索引 city 找到第一个满足 city='杭州’条件的主键 id，也就是图中的 ID_X；
+  - 到主键 id 索引取出整行，取 name、id 这两个字段，存入 sort_buffer 中；
+  - 从索引 city 取下一个记录的主键 id；
+  - 重复步骤 3、4 直到不满足 city='杭州’条件为止，也就是图中的 ID_Y；
+  - 对 sort_buffer 中的数据按照字段 name 进行排序；
+  - 遍历排序结果，取前 1000 行，并按照 id 的值回到原表中取出 city、name 和 age 三个字段返回给客户端。
+
+#### 2.9.3 全字段排序 Vs rowid排序
+- 选择原理
+  - 如果内存足够大，会优先全字段排序，尽量减少磁盘io
+  - 如果内存太小，会影响排序效率，才会采用rowid排序算法
+  - 对innodb表来说，rowid排序会要求回表多造成磁盘读，因此不会优先选择
+
+#### 2.9.4 如果减少文件排序
+- 添加索引(联合索引)，将数据变成有序
+- `alter table t5 add index city_name_age(city, name, age);` 联合索引，减少回表查询
+- 分析 `using index` 表示使用了覆盖索引，减少了回表查询
+
+#### 2.9.5 思考题
+- `select * from t where city in ('杭州',"苏州") order by name limit 100;` 会有排序过程吗
+  - 会
+  - 杭州的name是排好序，苏州的name也是排好序，但是加起来就不满足排序
+- 如果维护一个数据库端排序的方案，不需要额外排序
+  - 分别查询，归并排序
+
+
+### 2.10 如何正确显示随机消息
+#### 2.10.1 order by rand() 排序随机取几条数据的背后逻辑
+- `select word from words order by rand() limit 3` Using temporary(使用临时表); Using filesort(需要排序)
+  - 创建临时表，使用memory引擎，会有两个字段，一个double(存随机数), varchar(存word单词)，表中没有建索引
+  - 按主键取word值，调用rand()函数，将这两个值存在临时表中
+  - 然后将没有索引的临时表按照随机数排序
+  - 初始化sort_buffer, 将临时表的数据扫描添加到sort_buffer中，然后根据随机数排序
+  - 排完序之后取前三条结果返回位置信息，这样就可以直接从内存中取出word值
+  - `show variables like '%slow_query_log%';` 查看慢日志看扫描的行数
+
+#### 2.10.2 mysql如何定位一行数据？
+- 没有主键如何回表
+  - 删掉主键，mysql会自己生成一个长度为6字节的rowid来作为主键
+  - 排序过程中rowid的来历，标识数据行的信息
+    - 没有主键，rowid是系统生成，有主键，rowid就是主键id
+    - memory引擎不是索引组织表，可以认为是一个数组，rowid就是数组的下标
+- 总结order by rand()
+  - 使用了内存临时表
+  - 内存临时表排序的时候使用了rowid排序方法
+
+#### 2.10.3 磁盘临时表
+- 什么时候会使用
+  - 数据超过 tmp_table_size的限制，就会使用磁盘临时表， 默认16M
+  - `show variables like '%tmp_table_size%';`
+  - 磁盘临时表使用的引擎是innodb, 用`internal_tmp_dist_storage_engine`控制
+  - 使用磁盘临时表就是一个没有显示索引的innodb表排序过程
+- 为什么临时文件排序使用优先队列排序？而不是归并排序算法
+  - 使用优先队列就可以只得到前3个，不需要排所有的
+- 优先队列排序算法
+  - 对于这 10000 个准备排序的 (R,rowid)，先取前三行，构造成一个堆；
+  - 取下一个行 (R’,rowid’)，跟当前堆里面最大的 R 比较，如果 R’小于 R，把这个 (R,rowid) 从堆中去掉，换成 (R’,rowid’)；
+  - 重复第 2 步，直到第 10000 个 (R’,rowid’) 完成比较。
+  - 总是保证堆顶最大值
+
+#### 2.10.4 如果优化随机排序算法？
+- 思路1
+  - 取得这个表的主键 id 的最大值 M 和最小值 N;
+  - 用随机函数生成一个最大值到最小值之间的数 X = (M-N)*rand() + N;
+  - 取不小于 X 的第一个 ID 的行。
+  - 问题：空洞问题，会取不到值，概率不均衡
+- 思路2
+  - 取得整个表的行数，并记为 C
+  - 取得 Y = floor(C * rand())。 floor 函数在这里的作用，就是取整数部分。
+  - 再用 limit Y,1 取得一行。
+  - 注意：mysql处理limit的做法就是按顺序一个一个读出来，丢掉前Y个，然后把一个记录作为返回结果，因此需要扫描y+c+1行，代价相对高一些
+- 取三个值的随机算法
+  - 取得整个表的行数，记为 C；
+  - 根据相同的随机方法得到 Y1、Y2、Y3；
+  - 再执行三个 limit Y, 1 语句得到三行数据。
+- 思路3
+  - `select * from words where id >= (select floor(rand()*(select max(id) from words))) order by id limit 10;`
+  - 单词全部取出，使用redis缓存排序来处理业务，尽量不要让数据库做业务逻辑
+  - 可以重建索引解决空洞问题
+
+### 2.11 为什么mysql逻辑相同，性能差异这么大？
+#### 2.11.1 条件字段函数操作
+- `select count(*) from trade_log where month(t_modified)=7` t_modified上有索引
+  - 不会走索引
+  - `select * from words where id-1=999;` 索引失效
+
+#### 2.11.2 隐式类型转换
+- `select "10">9` 如果等于1,说明字符串转成了int, 否则int转成了字符串
+- `explain select * from tradelog where tradeid=3423422` tradeid有索引且类型为varchar(32)
+  - 会发生隐式类型转换，这样索引就会失效就会扫描全表
+  - 对优化器执行的代码如下 `select * from tradelog where CAST(tradid AS signed int) = 110717;`
+  - 也就是对索引字段操作，优化器会放弃走树搜索功能
+
+#### 2.11.3 隐式字符编码转换
+  - 关联表，一个是utf8, 一个是utf8mb4
+  - `select * from trade_detail where tradeid=$L2.tradeid.value;`
+    - 实际触发隐式转换 `select * from trade_detail  where CONVERT(traideid USING utf8mb4)=$L2.tradeid.value; `
+    - 连接过程中要求在被驱动表的索引字段上加函数操作，直接导致全表查询
+  - 如果解决字符串转换问题
+    - 将表的字符集修改成相同
+
+#### 2.11.4 另外慢查询场景
+- 100万数据的表，有一个b字段，int(10), 其中等于1234567890的数据有10万条
+  - `select * from t where b ="1234567890abcd";` 这个查询的执行流程，会走索引吗？
+  - 在传给引擎执行的时候，做了字符截断。因为引擎里面这个行只定义了长度是 10，所以只截了前 10 个字节，就是’1234567890’进去做匹配；
+  - 这样满足条件的数据有 10 万行；
+  - 因为是 select *， 所以要做 10 万次回表；
+  - 但是每次回表以后查出整行，到 server 层一判断，b 的值都不是’1234567890abcd’;
+  - 返回结果是空。
+
+#### 2.11.4 总结
+- 对索引字段做函数操作，可能破坏索引值的有序性，因此优化器就决定放弃走树搜索功能
+- 业务代码升级，执行explain是一个很好的习惯
+
+
+### 2.12 为什么查一行语句，也执行这么慢？
+#### 2.12.1 等到MDL锁
+- 查询长时间不返回
+  - `show processlist` 查看waiting for table metadata lock
+  - 一个线程正在表t上请求或持有MDL写锁，把select语句堵住了
+
+#### 2.12.2 等flush
+- **flush表的动作**
+  - `flush tables words with read lock;` 和 `flush tables with read lock;`
+  - flush表动作->关闭已打开的表对象，同时将查询缓存中的结果清空（会等到所有正在运行的sql请求）
+- 产生阻塞的流程
+  - `select sleep(1) from words;` 默认要执行10万秒
+  - `flush tables words` 需要关闭查询对象，就需要等待上一个结束，因此会阻塞
+  - `select * from words where id =1` 也会被阻塞，被flush命令阻塞
+  - `show processlist` 会出现 waiting for table flush
+
+#### 2.12.3 等行锁
+- 场景复现
+  - session A `begin; update words set word="adad" where id =1;`
+  - session B `select * from words where id=1 lock in share mode;`
+  - session A启动事务，占用写锁，但未提交
+  - session B查询需要获取读锁
+- 如果解决
+  - 找到对应的查询线程, 断开这个链接
+  - 链接被断开的时候，会自动回滚这个连接里面正在执行的线程，也就释放了id=1的行锁
+  - `show processlist; kill query processlist_id;`
+
+#### 2.12.4 慢查询
+- 没有索引，只是一条条扫描
+  - `select * from t where c=50000 limit 1;`
+  - 可以看慢查询扫描的行数
+  - 坏查询不一定是慢查询，线上一般超过1ms都不是好查询
+- 回滚日志太多，导致查询时间差的问题
+  - session B 执行10万次 `update words set c=c+1 where id=1;`
+  - session A `select * from words where id =1;` 会执行10次的回滚日志，所以比较耗时 
+  - session A `select * from words where id =1 lock in share mode;`
+  - `lock in share mode` 表示当前读，会直接读到结果不需要执行回滚日志
+
+#### 2.12.5 总结
+- 概念
+  - 表锁
+  - 行锁
+  - 一致性读 `lock in share mode`
+- 思考题？
+  - `select * from t where c= 5 for update;` 会等待行锁释放之后，返回查询结果
+  - `select * from t where c=5 for update nowait` 不等待，直接提示锁冲突，不返回结果
+  - `select * from t where c=5 for update wait 5` 等待5秒，如果行锁仍未释放，则提示行锁冲突，不返回结果
+  - `select * from t where c=5 for update skip locked` 直接返回结果，忽略行锁记录
+
+
+### 2.13 幻读是什么？幻读有什么问题？
+#### 2.13.1 幻读是什么？
+- 一个事务在前后两次查询同一范围的时候，后一次查询看到前一次查询没有看到的行
+  - 在rr级别下，普通查询时快照读，看不到别的事务插入的数据，因此，幻读在"当前读"才会出现
+  - 修改不能称为幻读，幻读专指"新插入的行"
+
+#### 2.13.2 幻读有什么问题？
+
+#### 2.13.3 如何解决幻读？
+- 间隙锁（Gap lock）只有在rr隔离级别下才生效
+  - 产生幻读的原因是，行锁只能锁住行
+  - 新插入记录这个动作，要更新的事记录之间的"间隙"
+  - 锁的就是两个值之间的空隙
+- `select * from t where d=5 for update`背后的逻辑
+  - 不光锁住数据库已有的记录(n)个行锁
+  - 还同时增加(n+1)个间隙锁，这样确保无法再插入新的记录
+- 间隙锁和行锁合成 next-key lock
+  - next-key lock 是一个前开后闭的区间
+  - 间隙锁为开区间，next-key lock为前开后闭区间
+
+#### 2.13.4 锁的冲突关系
+- 读锁/写锁
+  - 读锁与写锁冲突
+  - 写锁与写锁冲突
+  - 读锁与读锁不冲突
+- 间隙锁(gap lock)
+  - 间隙锁之间不存在冲突关系
+  - 间隙锁与往这个间隙插入一个记录存在冲突关系
+
+
+#### 2.13.5 思考
+- rc模式，binlog_format=row组合为啥要这样用
+  - row模式下保存的是每一行的前后记录，虽然占空间，但是不会因为保存命令而造成幻读
+- 即使给所有的行加锁也解决不了幻读的影响
+- 行锁确实比较直观，判断规则也相对简单，间隙锁的引入会影响系统的并发度，也增加了锁分析的复杂度
+
+
+### 2.14 为什么我只改变一行，锁这么多？
+#### 2.14.1 rr级别下，加锁的规则（两原则，两优化，一bug）
+- 5.x-5.7.24, 8.0-8.0.13版本中的情况
+  - 原则1: 加锁的基本单位是next-key lock, 是前开后闭区间
+  - 原则2: 查找过程中访问到的对象才会加锁
+  - 优化1: 索引上的等值查询，给唯一索引加锁时，next-key lock退化为行锁
+  - 优化2: 索引上的等值查询，向右遍历时且最后一个值不满足等值条件的时候，next-key lock 退化为间隙锁
+  - 一个bug: 唯一索引上的范围查询会访问到不满足条件的第一个值为止
+
+#### 2.14.2 各种案例分析
+- 等值查询间隙锁
+![](images/幻读/1.png)
+
+- 非唯一索引等值锁
+![](images/幻读/2.png)
+
+- 主键索引范围锁
+  ![](images/幻读/3.png)
+
+- 非唯一索引范围锁
+  ![](images/幻读/4.png)
+
+- 唯一索引范围锁bug
+  ![](images/幻读/5.png)
+
+- 非唯一索引上存在"等值"的例子
+ ![](images/幻读/6.png)
+
+- limit语句加锁
+  ![](images/幻读/7.png)
+
+- 一个死锁的例子
+  ![](images/幻读/8.png)
+
+### 2.15 mysql有哪些"饮鸩止渴"提高性能的方法？
+#### 2.15.1 短连接风暴
+- 短连接模型存在的风险
+  - 一旦数据库处理的慢一些，连接数就会暴涨
+  - 通过参数max_connections来查看最大的连接数
+  - 查看现有的mysql连接 `select * from information_schema.processlist;`
+  - `kill id;` 即可删掉连接
+- 处理的方式
+  - 第一种：先处理掉那些占着连接但是不工作的线程 `kill id`
+  - 第二种：减少连接过程的消耗
+    - 短时间大量的连接申请，跳过权限验证阶段, 重启加上参数 --skip-grant-tables
+    - 开启--skip-grant-tables参数，mysql默认会开启skip-networking参数，只能被本地客户端连接
+
+#### 2.15.2 慢查询的性能问题
+- 索引没有设计好
+  - 修改索引执行 alter table语句
+  - 理解做法： 
+    - 从库关闭 set sql_log_bin=off, 然后alter table添加索引
+    - 切换主从设备
+    - 在原来的主库执行set sql_log_bin=off, 修改alter table添加索引
+- sql语句没有写好
+  - `select * from t where id+1=1000;` 修改sql
+- mysql选错索引
+  - force index 强制指定索引
+  
+#### 2.15.3 如何提前发现索引没设计好和语句没有写好
+- 测试环境开启慢sql, 设置 long_query_time=0, 确保每个语句记录都写到慢日志
+- 测试表中模拟线上做回归测试
+- 观察慢日志，留意rows_examined字段师傅与预期一致
+- [慢日志分析工具](https://www.percona.com/doc/percona-toolkit/3.0/pt-query-digest.html)
+
+#### 2.15.4 Qps突增问题
+- 业务突然出现高峰，或者应用程序bug, 导致某个语句qps突然暴涨
+  - 一种由全新业务的bug导致的，直接去掉这个功能
+  - 如果新业务使用新的数据库，直接删掉账号，断开现有的连接
+  - 如果这个功能跟现有的主体部署一起，只能通过处理语句来限制
+
+
+### 2.16 mysql怎么保证数据不丢失
+- 重要结论
+  - 只要redo log和binlog保证持久化到磁盘，就能确保mysql异常重启后，数据可以恢复
+
+#### 2.16.1 binlog的写入机制
+- 写入逻辑
+  - 事务执行中，先把日志写入到binlog cache, 
+  - 事务提交的时候，将binlog cache写入到binlog磁盘文件中
+  - 一个事务的binlog不能被拆分，无论事务多大，都要保证一次性写入
+- binlog cache
+  - 每个线程一片内存，`show variables like '%binlog_cache_size%'` 查看大小
+  - 如果超过这个大小就要暂存到磁盘中
+  - 事务提交将binlog cache写入文件中，会清空binlog cache的缓存
+
+#### 2.16.2 binlog写盘分析
+![](./images/binlog/binlog_write_disk.png)
+- 分析
+  - 图中的 write，指的就是指把日志写入到文件系统的 page cache，并没有把数据持久化到磁盘，所以速度比较快。
+  - 图中的 fsync，才是将数据持久化到磁盘的操作。一般情况下，我们认为 fsync 才占磁盘的 IOPS。
+- write 和 fsync的时机，由参数 `show variables like '%sync_binlog%';` 控制
+  - 0，表示每次提交事务都只write， 不fsync
+  - 1，表示每次提交事务都会 fsync
+  - N(n>1) 表示累积N个事务提交之后，才fsync
+- 性能优化
+  - sync_binlog设置一个比较大的值，可以提升性能，解决一定的io问题
+  - 一般在100-1000之间
+  - 对应的风险：如果主机异常重启，会丢失最近N个事务的binlog日志
+
+#### 2.16.3 redo log的写入机制
+
+
