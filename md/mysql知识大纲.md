@@ -1,6 +1,9 @@
+**[TOC]
+
 # mysql实战45讲
 
-## 1. 基础篇
+## 基础篇
+
 ### 1.1 一条sql查询如何执行
 [链接](https://excalidraw.com/#json=YAoxWVyLifjAHstRdNLLI,3shnK3oLNTjFO0r8oPaiGA)
 ![](./images/mysql/mysql架构图.jpg)
@@ -209,6 +212,7 @@
 - 索引下推
   - 仅能利用使用最左前缀原则，利用二级索引的值进行判断，减少回表查询
   
+
 **思考？**
 - 什么场景适合用业务字段来表示主键
   - 只有一个索引（这个就没有二级索引占用额外的空间）
@@ -273,6 +277,7 @@
 - 回滚原理
   - 选择插入更新或者删除的行数最少的事务回滚，于 INFORMATION_SCHEMA.INNODB_TRX 表中的 trx_weight 字段来判断。
   
+
 **怎么解决热点数据更新导致的性能问题？**
 - 关闭死锁检测（风险：大量超时）
 - 做并发控制
@@ -871,5 +876,518 @@
   - 对应的风险：如果主机异常重启，会丢失最近N个事务的binlog日志
 
 #### 2.16.3 redo log的写入机制
+![](./images/redolog/1.png)
+- 三种状态分析
+  - 存redo log buffer中，物理上再mysql进程内存中，是红色部分
+  - 写到磁盘(write), 但没有持久化(fsync), 物理上是文件系统的page cache里面，是黄色部分
+  - 持久化到磁盘，对应hard dist, 对应绿色部分
+  - 写日志redo log buffer很快，write到page cache也差不多，持久化磁盘速度就慢很多
+- 控制redo log 的写策略
+  - `show variables like '%innodb_flush_log_at_trx_commint%';`
+  - 0, 每次事务提交，只把redo log 写到redo log buffer
+  - 1, 每次事务提交，都讲redo log 直接持久化到磁盘
+  - 2, 表示每次事务提交时都只是把redo log 写到page cache
+  - 注意：innodb有一个后台线程，每隔1秒，就会把redo log buffer中的日志，调用write写到文件系统重的page cache, 然后调用fsync持久化到磁盘
+- 额外场景，将一个没有提交的事务redo log写入到磁盘
+  - redo log buffer占用的空间即将达到 `show variables like '%innodb_log_buffer_size%';` 的一半时候，后台线程会主动写盘
+  - 并行的事务提交的时候，顺带将这个事务的redo log buffer持久化到磁盘
 
+#### 2.16.4 组提交机制(group commit)
+- 目的
+  - 减少IOPS消耗
+  - 将多个事务的redo log一起写入到磁盘
+- 参数控制
+  - `show variables like '%binlog_group_commit_sync_delay%';` 表示延迟多少微妙之后才调用fsync
+  - `show variables like '%binlog_group_commit_sync_no_delay_count` 表示积累多少次以后才调用
+  - 两者是或关系，只要一个满足条件就是会调用fsync
+
+#### 2.16.5 WAL机制
+- 性能优化点
+  - redo log 和 binlog 都是顺序写，磁盘的顺序写比随机写速度要快
+  - 组提交机制，可以大幅度降低磁盘的IOPS消耗
+- mysql性能IO上的优化
+  - 修改组提交参数，减少binlog写盘次数, 增加响应时间
+  - 修改`sync_binlog` 参数，多次才进行一次fsync，丢失binlog
+  - 修改 `innodb_flush_log_at_trx_commit`参数，每次事务都不进行fsync, 丢失binlog
+
+#### 2.16.6 思考题
+- 执行update语句，使用`hexdump` 命令查看ibd文件内容，没有看到数据的改变
+  - 有可能WAL机制，只保证了redo log, 内存，还没来得及同步到磁盘
+- 为什么binlog cache事每个线程自己维护，redo log buffer是全局共用？
+  - 设计原因，binlog是不能"被打断"，一个事务的binlog必须连续写，因此要整个事务完成后，再一起写到文件里
+  - redo log并没有这个要求，中间生成的日志可以写到redo log buffer中
+  - redo log中的内容还可以进行组提交，其他事务的内容，一起被写到磁盘
+- 事务执行期间，还没到提交阶段，如果发生crash, redo log肯定丢了，这会不会导致主备不一致？
+  - 不会，因为这时候binlog还在binlog cache里，还没发送给备库
+  - crash以后，redo log 和binlog都没有，从业务的角度这个事务也没有提交，所以数据一致
+- 如果binlog写盘以后发生crash, 这时候还没给客户端答复就重启了，等客户端再重连进来，发现事务已提交成功了，这是不是bug?
+  - 不是
+  - 实际上数据库crash-safe保证的是
+    - 如果客户端收到实物成功的消息，事务就一定持久化
+    - 如果客户端收到实物失败(主键冲突，回滚等)的消息，事务就一定失败
+    - 如果客户端收到执行异常的消息，应用需要重连后通过查询当前状态来继续后续的逻辑，此时数据库只需要保证内部(数据和日志之间，主从之间)一致就可以了
+- 你生产设置的"双1"吗？如果平时，你有什么场景改成过"非双1"吗？你的这种操作又基于决定？
+  - 业务高峰期。有可预知的高峰期，DBA会有预案
+  - 备库延迟为了让备库尽快赶上主库
+  - 用备份护肤主库的副本
+  - 批量导入数据
+  - 注意：一般设置 `set innodb_flush_logs_at_trx_commit=2;` `set sync_binlog=2`
+
+
+### 2.17 mysql怎么保证主备一致性？
+#### 2.17.1 主备的基本原理
+![](./images/主从/1.png)
+- 分析流程
+  - 主库A内部有一个线程，专门用于服务备库B的这个长连接
+  - 从库通过`change master`命令，设置主库IP、端口、账号、密码，以及从那个位置开始请求binlog(文件名，偏移量)
+  - 从库执行`start slave`命令，会启动io_thread、sql_thread线程，其中io线程与主库建立连接
+  - 主库校验账号密码之后，开始按照备库B传过来的位置，从本地读取binlog发送给B
+  - 从库拿到binlog,写到本地文件，称为中转日志(relay log)
+  - sql_thread读取中转日志，解析出日志里的命令，并执行， sql_thread是多线程
+
+#### 2.17.2 binlog的三种格式对比
+- `set binlog_format=statement;` 记录sql语句的原文
+  - `mysql-> show binlog events in 'binlog.000001;`
+  - `mysqlbinlog binlog.000001 --base64-output=decode-rows -v | more`
+    - --base64-output 控制输出格式base64编码
+    - decode-rows 把基于行的事件解码成一个sql语句
+- `set binlog_format=row;` 记录真实操作的数据
+  - 主备不会存在语义歧视，记录真正操作的主机id与数据
+  - 缺点：删除10万数据，需要记录10万条记录到binlog中，消耗IO,影响执行速度
+- `set binlog_format=mixed` 混合格式，两种都存在
+  - mysql会自己判断这条数据会不会引起主备一致性，如果有可能，就会使用row格式，否则用statement
+  - mixed即可利用statement格式的优点，同时避免了数据不执行的风险
+  - 时间函数 now()是否会导致主从一致性的问题，如果是statement格式的话
+- 如果解析binlog日志内容发生给mysql
+  - `mysqlbinlog binlog.000001  --start-position=2738 --stop-position=2973 | mysql -h127.0.0.1 -P13000 -u$user -p$pwd;`
+
+#### 2.17.3 循环复制问题
+![](./images/主从/2.png)
+- 分析，节点A与节点B互为主从，切换时，binlog是否会被不断循环执行
+  - 从节点 A 更新的事务，binlog 里面记的都是 A 的 server id；
+  - 传到节点 B 执行一次以后，节点 B 生成的 binlog 的 server id 也是 A 的 server id；
+  - 再传回给节点 A，A 判断到这个 server id 与自己的相同，就不会再处理这个日志。所以，死循环在这里就断掉了。
+
+#### 2.17.4 思考mysql其他高可用方案
+- 多节点
+- 半同步
+- Mysql group replication
+
+
+### 2.18 mysql怎么保证高可用？
+#### 2.18.1 主备延迟
+- 延迟的可能情况
+  - 运维动作(软件升级，主库所在机器按计划下线)
+  - 主库所在机器掉电
+- 如果查看主从延迟时间
+  - 从库执行 `show slave status` 其中 seconds_behind_master 表示当前从库延迟了多少秒
+  - seconds_behind_master的计算方法
+    - 每个事务binlog里面都有一个时间字段，用于记录主库的写入时间
+    - 备库取当前事务执行的时间字段，计算与系统的差，得到seconds_behind_master
+    - 精度是秒
+    - 不会受系统的时间不一致影响，会自动扣减系统的时间差
+
+#### 2.18.2 主备延迟的来源
+- 从库机器的性能要比主库所在的机器性能差
+  - 多主一从(现在很少)，因为现在需要主从切换
+- 备库压力大
+  - 从库提供读能力，备运营使用，导致消耗大量cpu资源，影响主备延迟
+  - 解决方案
+    - 一主多从，分担读压力
+    - binlog输出到外部系统，比如Hadoop, 让外部系统提供统计类查询能力
+- 大事务
+  - 主库必须等待事务执行完才会写入binlog, 再传给备库
+  - 一次性删除太多的数据，典型的大事务
+  - 大表的DDL， 也是大事务场景 
+- 备库的并行复制能力
+
+#### 2.18.3 主从切换的策略
+- 可靠性优先策略
+- 可用性优先策略
+
+#### 2.18.4 可靠性优先策略
+![](./images/主从/3.png)
+- 切换流程
+  - 判断备库 B 现在的 seconds_behind_master，如果小于某个值（比如 5 秒）继续下一步，否则持续重试这一步；
+  - 把主库 A 改成只读状态，即把 readonly 设置为 true；
+  - 判断备库 B 的 seconds_behind_master 的值，直到这个值变成 0 为止；
+  - 把备库 B 改成可读写状态，也就是把 readonly 设置为 false；
+  - 把业务请求切到备库 B。
+- 注意事项
+  - 切换有不可用时间，中间过程系统都在readonly状态，表示系统不可写
+  - 尽量保证seconds_behind_master值足够小
+
+#### 2.18.5 可用性优先策略
+- 代价：可能造成数据不一致性
+- binlog_format=mixed的场景
+  ![](./images/主从/4.png)
+  - 步骤 2 中，主库 A 执行完 insert 语句，插入了一行数据（4,4），之后开始进行主备切换。
+  - 步骤 3 中，由于主备之间有 5 秒的延迟，所以备库 B 还没来得及应用“插入 c=4”这个中转日志，就开始接收客户端“插入 c=5”的命令。
+  - 步骤 4 中，备库 B 插入了一行数据（4,5），并且把这个 binlog 发给主库 A。
+  - 步骤 5 中，备库 B 执行“插入 c=4”这个中转日志，插入了一行数据（5,4）。而直接在备库 B 执行的“插入 c=5”这个语句，传到主库 A，就插入了一行新数据（5,5）。
+- binlog_format=row的场景
+![](./images/主从/5.png)
+- 因为 row 格式在记录 binlog 的时候，会记录新插入的行的所有字段值，所以最后只会有一行不一致。而且，两边的主备同步的应用线程会报错 duplicate key error 并停止。也就是说，这种情况下，备库 B 的 (5,4) 和主库 A 的 (5,5) 这两行数据，都不会被对方执行。
+- 结论
+  - 使用 row 格式的 binlog 时，数据不一致的问题更容易被发现。而使用 mixed 或者 statement 格式的 binlog 时，数据很可能悄悄地就不一致了。如果你过了很久才发现数据不一致的问题，很可能这时的数据不一致已经不可查，或者连带造成了更多的数据逻辑不一致。
+  - 主备切换的可用性优先策略会导致数据不一致。因此，大多数情况下，我都建议你使用可靠性优先策略。毕竟对数据服务来说的话，数据的可靠性一般还是要优于可用性的。
+- 建议优先选择可靠性优先策略
+
+#### 2.18.6 思考
+- 运维系统
+  - 做从库延迟监控 `show slave status` 采集 seconds_behind_master值
+
+
+### 2.19 备库为啥延迟好几个小时？
+#### 2.19.1 产生的原因
+  - 如果备库执行日志的速度持续低于主库生成日志的速度，那么延迟可能是小时级别
+  - 对于一个压力比较高的主库来说，备库很有可能永远也追不上主库
+
+#### 2.19.2 并行复制模型
+![](./images/主从/6.png)
+- worker数量如何控制
+  - `show variables like '%slave_parallel_workers%';` 一般为机器的1/4-1/2核
+- coordinator在分发任务应遵循的原则
+  - 不能造成更新覆盖。也就是更新同一行的两个事务，必须背分派到同一个worker中
+  - 同一个事物不能被拆分，必须放到同一个worker中
+
+#### 2.19.3 并行复制的分发策略
+- mysql5.6 
+  - 按库并行
+  - 优势：hash值很快，只需要库名，不要求binlog的格式
+  - 缺点：主库的数据都放在同一DB,策略就会失效
+- mariaDB的并行策略
+  - 利用redo log的组提交优化
+    - 在同一组提交的事务，一定不会修改同一行
+    - 主库上可以并行执行的事务，备库也一定可以并行执行
+  - 实现的流程
+    - 在一组里面一起提交的事务，有一个相同的 commit_id，下一组就是 commit_id+1；
+    - commit_id 直接写到 binlog 里面；
+    - 传到备库应用的时候，相同 commit_id 的事务分发到多个 worker 执行；
+    - 这一组全部执行完成后，coordinator 再去取下一批。
+  - 存在的问题
+    - 第二组事务开始之前，必须等待第一组事务完全执行完成后
+- mysql5.7
+  - `show variables like '%slave-parallel-type%';`
+    - 配置DATABASE 表示按库并行
+    - 配置LOGICAL_CLOCK, 类似mariaDB
+    - 将commit表示锁的通过，其实在prepare已经通过
+  - 并行的核心思想【针对前面的优化】
+    - 时处于 prepare 状态的事务，在备库执行时是可以并行的；
+    - 处于 prepare 状态的事务，与处于 commit 状态的事务之间，在备库执行时也是可以并行的。
+- mysql5.7.22
+  - commit_order
+    - 根据同时进入 prepare 和 commit 来判断是否可以并行的策略。
+  - writeset
+    - 表示的是对于事务涉及更新的每一行，计算出这一行的 hash 值，组成集合 writeset。如果两个事务没有操作相同的行，也就是说它们的 writeset 没有交集，就可以并行。
+  - writeset_session
+    - 是在 WRITESET 的基础上多了一个约束，即在主库上同一个线程先后执行的两个事务，在备库执行的时候，要保证相同的先后顺序。
+
+#### 2.19.4 思考题
+- 主库单线程插入很多数据，过了3小时候，我们要搭建主库，为了尽快追上主库，要开并行复制，你如何选择策略
+  - 查看策略
+    - `show variables like '%binlog-transaction-dependency-tracking';`的策略 commit_order, writeset, writeset_session
+  - 分析
+    - 单线程不存在组提交，commit_order pass
+    - 要保证单线程的执行顺序，writeset_session也pass
+    - writeset 这种基于行的并行复制能力
+
+
+### 2.20 主库出问题了，从库怎么办？
+#### 2.20.1 一主多从技术架构
+![](./images/主从/7.png)
+- 分析
+  - 主备切换，也就是A点故障，主库切换成A'
+  - 从库转移，执行 `change master命令`
+  - `CHANGE MASTER TO MASTER_HOST=$host_name
+    MASTER_PORT=$port
+    MASTER_USER=$user_name
+    MASTER_PASSWORD=$password
+    MASTER_LOG_FILE=$master_log_name
+    MASTER_LOG_POS=$master_log_pos  `
+- 由于B是A的从库，本地记录的是A的位置，但相同的日志，A的位点和A'的位点不同，切换时，如果找到同步位点
+  - 等待新主库A'把中转日志(relay log)全部同步完成
+  - 在A'上执行`show master status`命令，得到当前A'最新的file和position
+  - 取原主库A故障的时刻T
+  - 用mysqlbinlog工具解析A'的file,得到T时刻的位点
+- 主从切换时，遇到错误如何处理
+  - 主动跳过一个事务
+    - `set global sql_slave_skip_counter=1;`
+    - `statrt slave;` 
+  - 跳过制定的错误
+    - `set slave_skip_errors=1032,1062`
+    - 常见的两种错误
+      - 1062 错误是插入数据时唯一键冲突；
+      - 1032 错误是删除数据时找不到行。
+
+#### 2.20.2 GTID
+- 解析
+  - 解决跳过事务和忽略错误达到最终一致性的复杂性
+- 如果解决找到同步位点的问题
+  - 设置全局事务ID(global transaction identifier), 在一个事务提交的时候生成，是这个事务的唯一标识
+  - 格式
+    - GTID=server_uuid:gno
+    - server_uuid 是一个实例第一个启动时自动生成的，是一个全局唯一的值
+    - gno是一个整数，初始值为1，每次提交事务时，加1
+- gtid模式启动
+  - 加上参数 gtid_mode=on 和 enforce_gtid_consistency=on
+- gtid的两种生成方式
+  - gtid_next=automatic 代表使用默认值
+    - 记录binlog 先设置一行 set @@session.gtid_next='server_uuid:gno'
+    - 把这个gtid加入本实例的gtid集合中
+  - gtid_next='current_gtid'
+    - 当current_gtid存在实例的集合中，接下来这个事务就会被系统忽略
+    - 当current_gtid不存在实例集合中，就把这个gtid分配给当前的事务，不需要系统产生新的gtid, 因此gno也+1
+
+#### 2.20.3 基于GTID的主备切换
+- 执行命令
+  - `CHANGE MASTER TO
+    MASTER_HOST=$host_name
+    MASTER_PORT=$port
+    MASTER_USER=$user_name
+    MASTER_PASSWORD=$password
+    master_auto_position=1 `
+  - 其中master_auto_position=1表示这个主备关系使用GTID协议
+- 主从同步的逻辑 (set_a表示实例A'的GTID集合，set_b表示实例B的GTID集合)
+  - 实例 B 指定主库 A’，基于主备协议建立连接。
+  - 实例B把set_b发送给A'
+  - 实例A'算出的set_a与set_b的差集，判断A'本地是否包含了这个差集需要的所有binlog事务
+    - 如果不包含，表示A'已经把实例B需要的binlog给删掉，直接返回错误
+    - 如果确认全部包含，A'从自己的binlog文件里面，找出第一个不在set_b的事务，发送给B
+  - 之后就从这个事务开始，往后读文件，按顺序取binlog发送给B去执行
+- 设计思想
+  - 在基于GTID的主备关系，系统认为只要建立主备关系，就必须保证主库发给备库的日志是完整的
+  - 也就是找位点的逻辑，在实例A'内部就已经自动完成，对HA系统开发人员说，非常友好
+
+#### 2.20.4 思考题
+- 在GTID模式下，从库执行`start slave`, 发现主库需要的binlog被删掉，导致主备创建不成功，应如果处理？
+  - 如果业务允许主从不一致的情况，那么可以在主库上先执行 show global variables like ‘gtid_purged’，得到主库已经删除的 GTID 集合，假设是 gtid_purged1；然后先在从库上执行 reset master，再执行 set global gtid_purged =‘gtid_purged1’；最后执行 start slave，就会从主库现存的 binlog 开始同步。binlog 缺失的那一部分，数据在从库上就可能会有丢失，造成主从不一致。
+  - 如果需要主从数据一致的话，最好还是通过重新搭建从库来做。
+  - 如果有其他的从库保留有全量的 binlog 的话，可以把新的从库先接到这个保留了全量 binlog 的从库，追上日志以后，如果有需要，再接回主库。
+  - 如果 binlog 有备份的情况，可以先在从库上应用缺失的 binlog，然后再执行 start slave。
+
+
+### 2.21 读写分离有哪些坑？
+#### 2.21.1 读写分离的架构特点
+**客户端直连**
+![](./images/主从/8.png)
+  - 架构简单，排查问题方便
+  - 可以使用zookeeper组件来控制mysql链接问题，让后端专注业务
+
+**proxy架构**
+![](./images/主从/9.png)
+  - 对客户端比较友好，不需要关注后端细节，连接卫华，后端信息维护，都由proxy完成
+  - proxy架构也需要高可用，带proxy架构比较复杂
+
+#### 2.21.2 过期读(从库上读到过期状态)
+- 主从延迟的解决方案
+  - 强制走主库方案
+  - sleep方案
+  - 判断主备无延迟方案
+  - 配合semi-sync方案
+  - 等主库位点方案
+  - 等GTID方案
+
+#### 2.21.3 强制走主库方案
+- 问题
+  - 不好判断业务走主库还是从库，
+  - 如果业务都不能是过期读，这样压力都会落到主库上
+
+#### 2.21.4 sleep方案
+- 问题
+  - 用户体验不优化
+  - 如果本来只需要0.5s就可以查到从库的正确数据，也要等1s
+  - 超过1s的延迟，出出现过期读
+
+#### 2.21.5 判断主备无延迟方案
+![](images/主从/10.png)
+- 第一种，先判断 `show slave status` 中 seconds_behind_master 是否已经等于0
+  - 精度不够，单位秒
+- 第二种，对比位点确保主备无延迟
+  - master_log_file和read_master_log_pos 表示读到主库的最新位点
+  - relay_master_log_file和exec_master_log_pos 表示备库执行的最新位点
+- 第三种，对比GTID集合确保主备无延迟
+  - auto_position=1, 表示主备关系使用GTID协议
+  - Retrieved_Gtid_Set，从库收到的所有日志GTID集合
+  - Executed_Gtid_Set, 备库所有已执行完成的GTID集合
+  - 如果两个值相同，表示从库接收到日志都已完成同步
+- 思考
+  ![img.png](images/主从/11.png)
+  - 备库还没有收到日志的状态，出现过期读
+    - trx1 和 trx2 已经传到从库，并且已经执行完成了；
+    - trx3 在主库执行完成，并且已经回复给客户端，但是还没有传到从库中。
+
+#### 2.21.6 配合semi-sync (半同步复制)
+- 主要解决binlog发送同步的问题
+- 设计思路
+  - 事务提交的时候，主库把binlog发个从库
+  - 从库收到binlog以后，发回给主库一个ack，表示收到了
+  - 主库收到这个ack以后，才能给客户端返回"事务完成"的确认
+- 一主多从同步的问题
+  - 一主多从，只要等到一个从库的ack，就开始给客户端返回确认
+    - 如果查询是落在这个响应ack的从库上，是能够确保读到最新数据
+    - 但如果查询落到其他从库上，它们可能还没收到最新日志，就会产生过期读的问题
+  - 业务高峰期，主库的位点或GTID集合更新很快，两个位点等值判断就会一直不成立，很有可能从库上迟迟无法响应查询请求的情况
+    ![](images/主从/12.png)
+
+#### 2.21.7 等主库位点方案
+![](images/主从/13.png)
+- 命令介绍
+  - 从库执行 `select master_pos_wait(file, pos[, timeout]);`
+  - 参数file 和pos指的是主库上文件名和位置
+  - timeout可选，设为正整数N，表示函数最多等待N秒
+    - 执行期间，备库同步线程发生异常，则返回null
+    - 如果等待超过N秒，就返回-1
+    - 如果刚开始执行的时候，发现已经执行过这个位置则返回0
+- 具体执行流程
+  - trx1 事务更新完成后，马上执行 `show master status` 得到当前主库执行到的 File 和 Position；
+  - 选定一个从库执行查询语句；
+  - 在从库上执行 `select master_pos_wait(File, Position, 1);`
+  - 如果返回值是 >=0 的正整数，则在这个从库执行查询语句；
+  - 否则，到主库执行查询语句。
+- 不允许过期读的要求，需做好限流策略
+  - 超时放弃
+  - 转主库查询
+
+#### 2.21.8 GTID等待方案
+![img.png](images/主从/14.png)
+- 命令介绍
+  - `select wait_for_executed_gtid_set(gtid_set, 1);`
+  - 等待，知道这个库执行的事务中包含传入的gtid_set, 返回0
+  - 超时返回1
+- 执行流程
+  - trx1 事务更新完成后，从返回包直接获取这个事务的 GTID，记为 gtid1；
+    - 可以直接在事务完成后获得GTID, 在5.7.6之后的版本可以用这种方案
+    - 可以通过 `show master status` 
+  - 选定一个从库执行查询语句；
+  - 在从库上执行 select wait_for_executed_gtid_set(gtid1, 1)；
+  - 如果返回值是 0，则在这个从库执行查询语句；
+  - 否则，到主库执行查询语句。
+- 如果在更新完事务之后，让返回的包能取到这个事务的GTID?
+  - `set session_track_gtids=OWN_GTID`
+  - 通过Api接口 mysql_session_track_get_first从返回包解析出GTID的值
+
+#### 2.21.9 思考题？
+- 使用GTID等位点方案做读写分离，在对大表做DDL的时候会怎样？
+  - 假设，这条语句在主库上要执行 10 分钟，提交后传到备库就要 10 分钟（典型的大事务）。那么，在主库 DDL 之后再提交的事务的 GTID，去备库查的时候，就会等 10 分钟才出现。
+  - 这个读写分离机制在这 10 分钟之内都会超时，然后走主库。
+  - 这种预期内的操作，应该在业务低峰期的时候，确保主库能够支持所有业务查询，然后把读请求都切到主库，再在主库上做 DDL。等备库延迟追上以后，再把读请求切回备库。
+
+
+### 2.22 如果判断一个数据库是不是处问题了？**
+#### 2.22.1 select 1判断
+- 问题
+  - 只能判断进程还在，并不能说明主库没有问题
+  - 例子： `show variables like '%innodb_thread_concurrency%;` 
+    - 表示innodb 只允许多少个进程同时执行， 如果为0，表示不限制并发线程数量
+    - 如果大事务堵住了并发进程，这样也会出现阻塞问题
+- 并发连接和并发查询
+  - 并发连接 `show processlist` 查看并发连接，成本不大，只是多占内存
+  - `innodb_thread_concurrency` 查看并发查询，cpu消耗比较高
+- 锁等待与并发线程计数(也就是锁的等待不算并发线程)
+  - 在线程进入锁等待以后，并发线程的计数器会减一
+    - 锁等待cpu不会消耗cpu, 这样设计可以避免整个系统锁死
+
+
+#### 2.22.2 查表判断
+- 思路(解决`select 1`并发线程过多导致的问题)
+  - 创建一个表，命名为 `health_check`, 只放一条数据
+  - `select * from mysql.health.check` 定期执行
+- 问题
+  - binlog导致磁盘满的问题，没办法检测
+  - 磁盘满，查询不受影响，更新就没办法处理
+  
+#### 2.22.3 更新判断
+- 思路
+  - `update mysql.health_check set t_modified=now();` 添加最后一次更新的时间
+  - 解决磁盘满的问题
+- 问题
+  - 如果主库从库使用相同的命令，可能发生行冲突，导致主备同步停止
+  - 因此mysql.check_health不能设计成只写一行数据，加一个`@@server_id`
+- 更新判断慢的问题
+  - 服务器IO资源分配的问题，如果IO资源打满
+  - 外部检测在执行轮询时，存在随机性，如果第一次检测刚好系统正常的话，就需要下次检测才能发现问题
+
+#### 2.22.4 内部统计
+- 针对磁盘问题 `select * from performance_schema.file_summary_by_event_name` 表示每次IO统计的时间
+  ![img.png](images/检测/1.png)
+  - 查看 event_name="wait/io/file/innodb/innodb_log_file" 这行的数据
+  - 统计redo log写入时间，event_name表示统计的类型
+  - count_star所有io的总次数
+  - 后面的4项单位皮秒，表示，总和，最小值，最大值，平均值
+  - 后面就是读操作统计，写操作统计
+- 问题
+  - 打开mysql自身的performance_schema统计会占用额外的性能
+  - 全部打卡会占用10%的额外性能 
+
+#### 2.22.5 思考题
+- 业务系统一般也有HA需求，你开发和维护过的服务中，怎么判断服务有没有出问题？
+  - 服务状态的监控，通过外部系统来实现
+  - 服务质量架空，通过接口响应时间来统计
+  - 按照监控对象
+    - 基础监控
+    - 服务监控
+    - 业务监控
+
+
+### 2.22 误删数据后除了跑路，还能怎么办？
+#### 2.22.1 使用delete语句误删数据行
+- flashback 实现
+  - 修改binlog的内容，拿回原库重放
+  - 前提是，需要确保binlog_format=row 和 binlog_row_image=FULL
+- 具体操作
+  - 对于insert语句，对应将binlog event类型是write_rows event 改成 Delete_rows event即可
+  - 同理，对于delete语句，也是将Delete_rows event 改为 Write_rows event;
+  - 而如果是Update_rows的话，binlog里面记录了数据行修改前和修改后的值，对调这两行的位置即可
+- 数据恢复的正确做法
+  - 恢复一个备份的库，在临时库上或者备份的库上操作，没有问题，再将确认过的临时数据恢复到主库
+  - 有可能会产生二次破坏，因为线上的数据一直在变更
+- 如果预防
+  - `show variables like '%sql_safe_updates%;` 设置为on
+  - 如果我们的delete或者update语句中写where条件，或者where条件没有包含索引，则报错
+  - 上线的代码，需要经过sql审计
+
+#### 2.22.2 误删表/库
+- 思路
+  - 定期的全量备份，实时备份的binlog
+- 假如中午12点误删一个库，恢复数据的流程如下
+  - 取最近一次全量备份，假设这个库一天一备，上次备份是当天0点
+  - 用备份恢复出一个临时库
+  - 从日志备份里面，取出凌晨0点之后的日志
+  - 把这些日志，除了误删数据的语句外，全部应用到临时库
+- 如何优化恢复的速度
+  - mysqlbinlog 加上 -database 制定需要恢复的数据库，这样就只用重放制定的库就好了
+  - 实例模式的不同
+    - 非GTID模式，只能通过--stop-position参数跳过删除语句，然后再--start-position恢复开始语句
+    - GTID模式，只需找到GTID号，然后执行`set gtid_next=gtid1;beign;commit;`
+- 因为mysqlbinlog是单线程，且不能指定对应table如果处理
+  - 并行复制(思考)
+
+#### 2.22.3 预防误删库/表的方法
+- 账号分离
+  - 只给开发DML权限，不给truncate/drop权限
+  - DBA团队成员，日常也只能使用只读账号，必要时才使用更新权限
+- 制定操作规范
+  - 删除数据表之前，必须先对表做改名操作，观察一段时间，无影响再执行删除操作
+  - 改表名加固定的后缀(_to_be_deleted), 然后由管理系统执行
+
+#### 2.22.4 rm删除数据
+- HA系统
+  - 不怕rm删除数据，只要不删除集群
+  - 最后跨城市保存
+
+#### 2.22.5 思考
+- 分享一些误删除数据的处理经验
+  - 直接拷贝文本去执行，sql语句被截断，导致数据库执行出错
+  - 还可能存在乱码
+- 四个脚本管理思路
+  - 备份脚本
+  - 执行脚本
+  - 验证脚本
+  - 回滚加班
+- 保护文件的方案
+  - 多做预防方案的设计讨论
+
+
+### 为什么还有kill不掉的语句？
 

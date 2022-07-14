@@ -1,0 +1,2523 @@
+<div>[TOC]</div>
+<h1>mysql实战45讲</h1>
+<h2>基础篇</h2>
+<h3>1.1 一条sql查询如何执行</h3>
+<p><a href='https://excalidraw.com/#json=YAoxWVyLifjAHstRdNLLI,3shnK3oLNTjFO0r8oPaiGA'>链接</a>
+<img src="./images/mysql/mysql架构图.jpg" referrerpolicy="no-referrer"></p>
+<h4>1.1.1 连接器</h4>
+<ul>
+<li>tcp连接之后，在进行用户账号密码权限认证，通过之后在权限表中查出所有权限</li>
+<li>之后这个连接里面的权限判断逻辑，都依赖此时读到的权限。(修改权限，原来的连接权限不变)</li>
+<li>空闲连接啥时候被回收 <code>show variables like &#39;%wait_timeout%&#39;</code> 单位秒，默认8小时</li>
+
+</ul>
+<p><strong>怎么解决长连接导致内存占用过大问题</strong>  </p>
+<ul>
+<li>定期断开连接</li>
+<li>版本大于5.7可以通过 mysql_reset_connection() 初始化连接资源</li>
+
+</ul>
+<h4>1.1.2 查询缓存</h4>
+<ul>
+<li>鸡肋产物，redis完美解决</li>
+
+</ul>
+<h4>1.1.3 分析器</h4>
+<ul>
+<li>词法解析，语法解析</li>
+
+</ul>
+<h4>1.1.4 优化器</h4>
+<ul>
+<li>多个索引时候，决定用哪一个</li>
+<li>多表关联时，决定表的连接顺序</li>
+<li>等等</li>
+
+</ul>
+<h4>1.1.5 执行器</h4>
+<ul>
+<li>先要判断你对这个表有没有执行权限(表权限判断)</li>
+<li>选择表对应的引擎提供的接口操作</li>
+
+</ul>
+<h3>1.2 一条sql更新是如何执行的</h3>
+<ul>
+<li>与查询基本差不多，需要失效所有的表相关的缓存</li>
+<li>找到数据进行更新</li>
+<li>设计重要的日志记录（重做日志，归档日志）</li>
+
+</ul>
+<h4>1.2.1 重要的日志模块： redo log</h4>
+<ul>
+<li><p>是innodb引擎层的日志</p>
+</li>
+<li><p>WAL(write ahead logging)技术</p>
+<ul>
+<li>磁盘顺序写比随机写快</li>
+<li>组提交机制可以大幅降低磁盘的IOPS消耗(fsync)</li>
+
+</ul>
+</li>
+<li><p>刷脏页策略如何控制</p>
+<ul>
+<li>定时刷</li>
+<li>buffer pool不足</li>
+<li>mysql 正常关闭</li>
+<li>redo log满的时候</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>1.2.2 重要的日志模块：binlog</h4>
+<ul>
+<li>为归档日志，在server层做记录，没有crash-safe能力</li>
+<li>数据更新执行器流程<br/><img src="./images/mysql/数据更新执行器流程.png" referrerpolicy="no-referrer"></li>
+
+</ul>
+<p><strong>思考？</strong></p>
+<ul>
+<li><p>为什么有了redo log还需要binlog, 谈一下你对这两种日志的理解，以及它们的区别？</p>
+<ul>
+<li>redo log 是innodb所有，binlog是所有的引擎所有，在sever层</li>
+<li>redo log 是物理日志，记录某个数据页修改了什么，binlog是逻辑日志，记录语句的原始逻辑，比如&quot;给ID=2的字段c加1&quot;</li>
+<li>redo log是循环写，空间固定会用完，binlog是追加写，不会覆盖以前的日志</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>1.2.3 两阶段提交</h4>
+<ul>
+<li>redo log分为两个阶段prepare和commit阶段，拆成两份的目的是为了保证两份日志之间逻辑一致</li>
+<li>数据要做定期的备份</li>
+
+</ul>
+<p><strong>思考</strong></p>
+<ul>
+<li><p>怎么让数据库恢复到半个月内任意一秒状态？</p>
+<ul>
+<li>先找到最近的全量备份，将这个备份恢复到临时库</li>
+<li>从备份的开始时间算，将备份的binlog依次取出，重放到指定的时刻</li>
+<li>然后再把临时的数据库恢复到线上</li>
+
+</ul>
+</li>
+<li><p>日志为啥需要&quot;二阶段提交&quot;？(1 prepare阶段 2 写binlog 3 commit)</p>
+<ul>
+<li>redo log与binlog提交的先后顺序都会导致日志数据的不一致</li>
+<li>当在2之前崩溃时, 重启恢复：后发现没有commit，回滚。备份恢复：没有binlog 。</li>
+<li>当在3之前崩溃 ,重启恢复：虽没有commit，但满足prepare和binlog完整，所以重启后会自动commit。备份：有binlog.</li>
+
+</ul>
+</li>
+<li><p>什么场景需要用到binlog和redo log来恢复数据?</p>
+<ul>
+<li>误操作恢复数据</li>
+<li>扩容恢复从库都会有问题 </li>
+
+</ul>
+</li>
+
+</ul>
+<h3>1.3 事务隔离：为什么你改了我还看不到？</h3>
+<ul>
+<li><p>事务特性(ACID)</p>
+<ul>
+<li>原子性</li>
+<li>一致性</li>
+<li>隔离性</li>
+<li>持久性</li>
+
+</ul>
+</li>
+<li><p>多个事务同时执行可能出现的问题</p>
+<ul>
+<li>脏读(dirty read) (读到其他事务未提交的数据)</li>
+<li>不可重复读(non-repeatable read) (前后读取的记录内部不一致)</li>
+<li>幻读(phantom read) (前后读取的记录行数不一致)</li>
+
+</ul>
+</li>
+<li><p>隔离级别</p>
+<ul>
+<li>读未提交(read uncommitted)  (没有视图，直接返回最小行数据)</li>
+<li>读已提交(read committed) 视图(事务启动时创建)</li>
+<li>可重复读(repeatable read) 视图(在sql语句执行时创建) 事务在整个执行的过程中前后看到的数据是一致的</li>
+<li>串行化(serializable)   加锁</li>
+
+</ul>
+</li>
+<li><p>如何查看事务的隔离级别</p>
+<ul>
+<li><code>show variables like &#39;transaction-isolation&#39;;</code></li>
+
+</ul>
+</li>
+<li><p>RR级别的隔离如何解决幻读</p>
+<ul>
+<li><code>for update</code> 添加排他锁，当前读，也就是写锁</li>
+<li>使用可串行化(serializable)</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>1.3.1 事务隔离级别的实现</h4>
+<ul>
+<li>MVCC(多版本并发控制)</li>
+<li>undo log(回滚日志)</li>
+
+</ul>
+<h4>1.3.2 事务的启动方式</h4>
+<ul>
+<li><p>begin, start transaction</p>
+</li>
+<li><p>rollback</p>
+</li>
+<li><p>commit</p>
+</li>
+<li><p>set autocommit=0 关闭自动提交事务，减少显示设置开启事务</p>
+</li>
+<li><p>修改事务的隔离级别</p>
+<ul>
+<li><code>set global transaction isolation level read committed;</code></li>
+<li>或者通过修改配置</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>1.3.3 事务到底是隔离还是不隔离？</h4>
+<ul>
+<li><p><code>begin/start transaction</code> 并不是事务的起点，一致性快照的起点</p>
+<ul>
+<li>一致性快照是在执行第一个快照读语句创建</li>
+<li>一致性快照是在执行<code>start transaction with consistent snapshot</code></li>
+
+</ul>
+</li>
+<li><p>在mysql有&quot;两个&quot;视图的概念</p>
+<ul>
+<li>一个是view, 通过create view....</li>
+<li>一个是MVCC的一致性读视图，consistent read view，用在RC、RR隔离中实现
+-没有物理结构，用来定义事务执行期能看到什么数据</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>1.3.4 快照在MVCC里是怎样工作的</h4>
+<ul>
+<li>快照是基于整库实现的，主要是一个数组（当前正在&quot;活跃&quot;的所有事物）的拷贝</li>
+<li>Innodb的每个事务都有一个唯一的ID,叫transaction id，是事务开始的时候申请的，按顺序严格递增</li>
+<li>每行数据有多个版本，每次事务更新数据的时候都会生成一个新的版本，并且把transaction id 赋值给这个版本的数据，旧数据保留，新版本可以直接拿到这个版本数据</li>
+<li>也就是数据表中的一行记录，其实可能有多个版本记录，每个版本记录有自己的row trx_id</li>
+
+</ul>
+<p><strong>回滚日志（undo log）</strong></p>
+<ul>
+<li><p>多版本并不是物理上真实存在的，而是通过undo log计算出来的</p>
+<ul>
+<li>比如需要V2版本的数据（需要通过v4版本依次执行U3、U2算出来）</li>
+
+</ul>
+</li>
+
+</ul>
+<p><strong>可重复读的隔离级别定义</strong></p>
+<ul>
+<li>一个事务启动时，能够看到所有已提交的事务结果，但是之后，在执行期间，其实事务的更新对它不可见</li>
+<li>事务执行之后，其他事务的更新对它虽然不可见，但是数据版本还是可见的，因为数据库实际上存储的是最新版本的数据。但是对于该事务来说，需要根据版本号以及Undo Logs计算出他需要的版本对应的数据</li>
+
+</ul>
+<p><strong>事务的可重复读能力是怎么实现的？</strong></p>
+<ul>
+<li>核心是一致性读（consistent read）</li>
+<li>事务更新数据的时候只能用<em>当前读</em></li>
+<li>如果当前事物的行锁被其他事务占用的话，就需要进入锁等待</li>
+
+</ul>
+<p><strong>读提交与可重复读的逻辑类似，主要区别</strong></p>
+<ul>
+<li>可重复读隔离级别下，只需要在事务开始时候创建一致性视图，之后事务里的其他查询都共用这个一致性视图</li>
+<li>在读提交的隔离级别下，每一条语句执行都会重新算出一个新的视图</li>
+
+</ul>
+<p><strong>思考</strong></p>
+<ul>
+<li><p>回滚日志什么时候删除?</p>
+<ul>
+<li>系统中没有比回滚日志更早的日志就可以删除原因，因为read-view在commit之后就会被删掉</li>
+<li>没有事务再需要用到这个回滚日志，会被purge进程删掉</li>
+
+</ul>
+</li>
+<li><p>怎么看innodb中的长事务？对系统的危害有哪些？</p>
+<ul>
+<li>information_schema.INNODB_TRX</li>
+<li>长事务的危害，导致undo log一直不回被删掉，导致大量的记录会被保留，占用额外的存储空间</li>
+<li>占用锁资源，拖垮数据库</li>
+
+</ul>
+</li>
+<li><p>如何避免系统的长事务？</p>
+<ul>
+<li><p>应用端思考</p>
+<ul>
+<li>开是否开启auto_commit, 开启general_log日志，去确定业务逻辑是否有问题</li>
+<li>确定是否有不必要的只读事务，把不必要的select从事务中去掉</li>
+<li>根据业务本身预估设置max_execution_time的最长时间，必须单条语句执行过长</li>
+
+</ul>
+</li>
+<li><p>从数据库端思考</p>
+<ul>
+<li>监控information_schema.INNODB_TRX的表的数据，设置报警，超时kill动作</li>
+<li>利用pt-kill工具监控长事务</li>
+<li>保证undo log表空间足够</li>
+
+</ul>
+</li>
+
+</ul>
+</li>
+<li><p>为啥表结构没有可重复读？</p>
+<ul>
+<li>因为表结构没有对应的行数据，也没有row trx_id,因此只能遵循当前的读逻辑</li>
+
+</ul>
+</li>
+
+</ul>
+<h3>1.4 深入浅出索引</h3>
+<ul>
+<li>索引的目的是为了提高数据的查询效率</li>
+
+</ul>
+<h4>1.4.1 索引常见的模型</h4>
+<ul>
+<li><p><strong>hash表</strong>，适合等值查询，不适合区间查询</p>
+</li>
+<li><p><strong>有序数组</strong>，等值查询与范围查询都很优秀，添加数据要移动数组，且空间有限</p>
+</li>
+<li><p><strong>二叉搜索树</strong>，</p>
+<ul>
+<li>为了维持O(log(N))的查询效率，需要维持这个数的平衡</li>
+<li>二叉搜索的效率高，但不用的原因主要是因为索引除了存在内存中外，还有可能在磁盘上，树太高，磁盘寻址太慢</li>
+<li>为了减少数据块的访问次数，因此我们就应该使用N叉树，这里的N取决于数据块的大小</li>
+<li>N叉树的读写性能优点，以及适配磁盘的访问模式，非常适合数据库存储引擎</li>
+
+</ul>
+</li>
+<li><p><strong>跳表(skiplist)</strong>，增加向前指针的链表(多级索引)，随机化数据结构，可以进行二分查找的有序链表</p>
+</li>
+<li><p><strong>LSM树</strong>，使用顺序写代替随机写来提高性能，与此同时微弱降低读性能</p>
+</li>
+
+</ul>
+<h4>1.4.2 Innodb索引模型</h4>
+<ul>
+<li><p>B+树索引模型</p>
+<ul>
+<li>每一个索引在Innodb里面对应一颗B+树</li>
+<li>索引类型分为主键索引(聚族索引)，非主键索引(二级索引)</li>
+
+</ul>
+</li>
+<li><p>主键索引与普通索引的查询有啥不同？</p>
+<ul>
+<li>非主键查询可能需要进行回表，索引覆盖之后就不用回表</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>1.4.3 索引维护</h4>
+<ul>
+<li><p>维护索引数据的有序性</p>
+<ul>
+<li>在插入的时候需要进行维护，推荐使用自增主键，好处是每次插入数据追加，不必需要数据移动</li>
+<li>自增主键 <code>not null primary key auto_increment</code></li>
+
+</ul>
+</li>
+<li><p>业务字段做主键问题</p>
+<ul>
+<li>逻辑的字段不容易保证数据的自增，这样写数据成本相对高一点</li>
+<li>如果字段大小控制不好，导致二级索引需要占用更多的额外空间</li>
+
+</ul>
+</li>
+<li><p><strong>页分裂</strong></p>
+<ul>
+<li>页数据满，需要申请额外的页，移动部分数据，这个过程称为页分裂，会影响数据页的空间利用率</li>
+
+</ul>
+</li>
+<li><p><strong>页合并</strong></p>
+<ul>
+<li>相连的两个页由于数据的删除，导致空间利用率很低，会进行页的合并</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>1.4.4 经典范围查询如果做回表</h4>
+<ul>
+<li><p><code>select * from t1 where k between 3 and 5</code></p>
+<ul>
+<li>先找k索引树上的3，通过Id进行回表</li>
+<li>再顺序访问k上的4，通过ID进行回表</li>
+<li>再顺序访问k上的5，通过ID进行回表</li>
+<li>最后访问k上的6，不满足条件退出循环。</li>
+
+</ul>
+</li>
+<li><p>如何避免回表查询</p>
+<ul>
+<li>覆盖索引，减少树的搜索，一种常见的优化手段</li>
+
+</ul>
+</li>
+<li><p>最左前缀原则</p>
+<ul>
+<li>联合索引是先根据第一个字段排序，如果第一个字段相同，再根据第二个字段排序</li>
+<li>创建联合索引要考虑索引字段的排序，尽量保证索引的复用能力</li>
+<li>如果(a,b)字段分开查询的频率都比较高，就要考虑字段的空间，来建立联合索引</li>
+
+</ul>
+</li>
+<li><p>索引下推</p>
+<ul>
+<li>仅能利用使用最左前缀原则，利用二级索引的值进行判断，减少回表查询</li>
+
+</ul>
+</li>
+
+</ul>
+<p><strong>思考？</strong></p>
+<ul>
+<li><p>什么场景适合用业务字段来表示主键</p>
+<ul>
+<li>只有一个索引（这个就没有二级索引占用额外的空间）</li>
+<li>该索引必须是唯一索引（这样就不会重复）</li>
+
+</ul>
+</li>
+<li><p>Innodb为什么要用B+树来进行索引</p>
+<ul>
+<li>更好配合的磁盘的读写特性，减少单次查询磁盘的访问次数</li>
+
+</ul>
+</li>
+<li><p>没有主键索引建普通索引，Innodb是如何进行查询</p>
+<ul>
+<li>如果删除，新建主键索引，会同时去修改普通索引对应的主键索引，性能消耗比较大。</li>
+<li>删除重建普通索引貌似影响不大，不过要注意在业务低谷期操作，避免影响业务。</li>
+
+</ul>
+</li>
+
+</ul>
+<h3>1.5 全局锁和表锁</h3>
+<ul>
+<li><p>锁的目的</p>
+<ul>
+<li>处理多用户访问共享资源的并发问题</li>
+
+</ul>
+</li>
+<li><p>锁分类</p>
+<ul>
+<li>全局锁、表锁、行锁</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>1.5.1 全局锁</h4>
+<ul>
+<li><p>对数据库整个实例加锁</p>
+<ul>
+<li><code>flush tables with read lock</code> (让数据库只读)</li>
+<li><code>unlock tables</code> (解除数据库的全局锁)</li>
+<li>应用场景，坐全库逻辑备份</li>
+
+</ul>
+</li>
+<li><p>官方的mysqldump对数据进行备份，如何保证数据的一致性</p>
+<ul>
+<li>导数据之前，会启用一个事务，来确保拿到数据的一致性视图</li>
+<li>为啥还需要FTWRL, 因为并不是所有的引擎都支持</li>
+
+</ul>
+</li>
+<li><p>为啥不使用 <code>set global readonly=true</code> 来设置只读</p>
+<ul>
+<li>readonly有可能用到其他业务，比如主从</li>
+<li>客户端异常断开，FTWRL会释放锁，但是readonly不会，所以风险更高</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>1.5.2 表级锁</h4>
+<ul>
+<li><p>分两种</p>
+<ul>
+<li>表锁</li>
+<li>元数据锁(meta data lock)MDL</li>
+
+</ul>
+</li>
+<li><p>表锁语法</p>
+<ul>
+<li>lock tables ... read/write</li>
+<li>write锁是排它锁，意味着其他线程不能读写</li>
+<li>read锁是共享锁，意味着其他线程只读不写，本线程也只能读不能写</li>
+
+</ul>
+</li>
+<li><p>MDL不显示使用</p>
+<ul>
+<li>一个访问就会自动加上，如果在查询的过程中，表结构数据发生变化，导致数据内容对不上，肯定不行</li>
+<li>在做增删改查的时候加上MDL读锁，在对表结构修改时加上写锁</li>
+<li>MDL锁只有在事务提交的时候才释放，要小心防止锁住线上数据</li>
+
+</ul>
+</li>
+<li><p>如何给你查询频繁的表添加字段</p>
+<ul>
+<li>防止阻塞，添加等待时间，如果在规定的时间还没拿到锁就放弃，后面再重试</li>
+<li><code>alter table t1 nowait/wait n add column</code></li>
+
+</ul>
+</li>
+
+</ul>
+<h4>1.5.3 行级锁</h4>
+<ul>
+<li>是有引擎自己实现了，并不是所有引擎都支持，MyiSAM就不支持行锁</li>
+<li>Innodb行锁的默认超时时间为 innodb_lock_wait_timeout设置为on</li>
+
+</ul>
+<p><strong>二阶段锁</strong></p>
+<ul>
+<li>行锁实在需要的时候加上的，但不是立马就释放，而是等到事务提交才释放</li>
+<li>锁的添加与释放分为两个阶段，之间不允许交叉加锁和释放锁</li>
+<li>如果你的事务可能要锁多行，就要把最有可能造成冲突的锁，影响并发度的锁放在后面</li>
+
+</ul>
+<p><strong>Innodb死锁的产生，如何解决死锁问题</strong></p>
+<ul>
+<li><p>由于两个事务之间资源循环依赖，涉及的线程都在等待别的线程资源释放，导致死锁的产生</p>
+</li>
+<li><p>两种策略解决死锁</p>
+<ul>
+<li>进入等待，一直到超时 innodb_lock_wait_timeout</li>
+<li>发起死锁检测，发现死锁，主动回滚死锁链条中的某一个事务，让其他事务能执行 innodb_deadlock_detect</li>
+
+</ul>
+</li>
+<li><p>死锁检测原理</p>
+<ul>
+<li>构建一个以事务为顶点、锁为边的有向图，判断有向图是否存在环，存在即有死锁</li>
+
+</ul>
+</li>
+<li><p>回滚原理</p>
+<ul>
+<li>选择插入更新或者删除的行数最少的事务回滚，于 INFORMATION_SCHEMA.INNODB_TRX 表中的 trx_weight 字段来判断。</li>
+
+</ul>
+</li>
+
+</ul>
+<p><strong>怎么解决热点数据更新导致的性能问题？</strong></p>
+<ul>
+<li>关闭死锁检测（风险：大量超时）</li>
+<li>做并发控制</li>
+<li>优化业务逻辑</li>
+
+</ul>
+<h2>2. 实战篇</h2>
+<h3>2.1 普通索引与唯一索引的选择？</h3>
+<h4>2.1.1 查询过程</h4>
+<ul>
+<li>以如下语句进行优化
+<code>select * from t where k = 5;</code></li>
+
+</ul>
+<p><strong>普通索引</strong></p>
+<ul>
+<li>先通过普通索引k查找到满足k=5的记录，然后再去判断下一条记录是否满足k=5, 然后回表查询记录</li>
+<li>由于innodb的最小单位是page, 默认大小为16kb, 所以下一条记录的判断绝大多的时候不需再次进行磁盘Io, 除非分页</li>
+
+</ul>
+<p><strong>唯一索引</strong></p>
+<ul>
+<li>由于唯一索引的唯一性，查询到唯一满足条件的时候就会停止检索，然后回表查询到对应记录</li>
+<li>因为唯一索引比普通索引查询性能好一丢丢。理论上cpu的操作性能损耗应忽略</li>
+
+</ul>
+<h4>2.1.2 change buffer(可以持久化数据)</h4>
+<ul>
+<li><p>当需要数据更新的时候</p>
+<ul>
+<li>如果数据在内存中，直接更新</li>
+<li>如果不在内存中，在不影响一致性的前提，更新操作会缓存再change buffer中，这样就不需要从磁盘中读取数据</li>
+
+</ul>
+</li>
+<li><p>在下次访问数据页的时候(merge操作)</p>
+<ul>
+<li>将数据缓存到内存中，然后执行change buffer中与这个页的操作，更新内存中的数据</li>
+
+</ul>
+</li>
+<li><p>什么情况下会触发merge操作(将change buffer的数据应用到原始数据页)</p>
+<ul>
+<li>读操作</li>
+<li>后台线程定期merge</li>
+<li>数据库的正常关闭</li>
+
+</ul>
+</li>
+<li><p>change buffer主要为了解决什么问题</p>
+<ul>
+<li>减少读磁盘(随机读)</li>
+
+</ul>
+</li>
+<li><p>什么情况下可以使用change buffer?</p>
+<ul>
+<li>由于唯一索引必须判断这个k=4这条记录否是存在索引中，所以必须先将数据读入到内存中。因为唯一索引不能使用change buffer</li>
+<li>普通索引可以使用change buffer</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.1.3 思考题？</h4>
+<ul>
+<li><p>某次写使用了change buffer机制，之后主机异常，是否会造成change buffer数据丢失？</p>
+<ul>
+<li>不会丢失</li>
+<li>虽然只更新内存，但在事务提交的时候，change buffer记录在redo log</li>
+<li>系统恢复会通过redo log恢复change buffer的数据</li>
+
+</ul>
+</li>
+<li><p>merge的执行流程如何？会把数据写回磁盘？</p>
+<ul>
+<li>从磁盘中读入数据页到内存(老版本的数据页)</li>
+<li>从change buffer里找到这个数据页的change buffer记录(可能多条)，依次执行，得到新的数据页</li>
+<li>写入redo log, 这个redo log包含了数据的变更和change buffer记录的变更。</li>
+<li>merge就执行完成了，因此merge不会写入磁盘，写入磁盘是脏页的刷新逻辑</li>
+
+</ul>
+</li>
+
+</ul>
+<h3>2.2 mysql为什么会选错索引</h3>
+<h4>2.2.1 索引选择的工作原理</h4>
+<ul>
+<li><p>优化器选择索引的逻辑</p>
+<ul>
+<li><p>扫描的行数(扫描行数越少-&gt;访问磁盘越少-&gt;消耗cpu越少)</p>
+<ul>
+<li><p>根据统计信息估算记录数，也就是&quot;区分度&quot;，不同的值越多，区分度越高</p>
+</li>
+<li><p>查看索引的基数 <code>show index from t4;</code> &quot;cardinality&quot;</p>
+</li>
+<li><p>通过采样统计来确定</p>
+<ul>
+<li>默认选择N页，统计不同值，得到平均値，然后再乘以索引的页面数，这样就可以得到索引的基数</li>
+<li>当变更的数超过 1/M 页的时候，会触发重新做一次索引统计</li>
+
+</ul>
+</li>
+<li><p>两种存储索引统计的方式，通过innodb_stats_persistent来设置</p>
+<ul>
+<li>on 表示统计信息回持久化存储，默认N=20,M=10</li>
+<li>off 表示统计信息只存储在内存中，默认N=8,M=16</li>
+
+</ul>
+</li>
+
+</ul>
+</li>
+<li><p>优化器还要考虑索引回表查询的代价</p>
+<ul>
+<li><code>analyze table t4</code> 可以用来重新统计索引信息</li>
+
+</ul>
+</li>
+<li><p>是否使用临时表(内存不够，使用基于磁盘的临时表)</p>
+<ul>
+<li>union查询</li>
+<li>order by 与 group by的子句不一样时</li>
+<li>distinct查询并加上order by时</li>
+<li>子查询</li>
+
+</ul>
+</li>
+<li><p>是否进行排序</p>
+<ul>
+<li><code>explain select * from t4 where a between 1 and 1000 and b between 50000 and 100000 order by b limit 1;</code> 使用索引b, 而不是索引a</li>
+<li>因为使用索引a, 优化器会认为使用文件排序需要额外的消耗，所以选错索引</li>
+
+</ul>
+</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.2.2 索引选错异常处理</h4>
+<ul>
+<li><p>使用force index 强行选择索引</p>
+<ul>
+<li><code>explain select * from t4 force index(a) where a between 1 and 1000 and b between 50000 and 100000 order by b limit 1;</code></li>
+<li>不够优美，变更索引名需要调整等问题</li>
+
+</ul>
+</li>
+<li><p>修改sql, 使其命中我们期望的索引</p>
+<ul>
+<li><code>explain select * from t4 where a between 1 and 1000 and b between 50000 and 100000 order by b,a limit 1;</code></li>
+<li>调整 order by 使其选择任何一个索引都需要排序</li>
+<li><code>explain select * from  (select * from t4 where (a between 1 and 1000)  and (b between 50000 and 100000) order by b limit 100)alias limit 1;</code></li>
+<li>诱导编译器选择索引b代价很高</li>
+
+</ul>
+</li>
+<li><p>新建更适合的索引，来提供给优化器做选择，或删掉误用的索引</p>
+<ul>
+<li>删掉不合适的索引</li>
+<li>建立联合索引避免回表查询等</li>
+
+</ul>
+</li>
+
+</ul>
+<h3>2.3 怎么给字段添加索引</h3>
+<ul>
+<li><p>使用索引的原则</p>
+<ul>
+<li>区分度越高越好，因为高区分度，意味着复用的键值越少</li>
+
+</ul>
+</li>
+<li><p>索引创建的使用场景</p>
+<ul>
+<li>直接创建完整索引，要注意空间的占用情况</li>
+<li>前缀索引，节省空间，但会增加查询扫描次数，并且不能使用索引覆盖</li>
+<li>倒叙索引，可以解决前缀索引区分度不够问题，不支撑范围查询</li>
+<li>hash索引，查询性能稳定，需要额外的存储和计算消耗，不支持范围查询</li>
+
+</ul>
+</li>
+
+</ul>
+<h3>2.4 为什么我们的mysql会&quot;抖&quot;一下</h3>
+<h4>2.4.1 脏页的概念</h4>
+<ul>
+<li><p>脏页/干净页的理解</p>
+<ul>
+<li>当内存数据页跟磁盘数据页内容不一至的时候，我们称这个内存页为&quot;脏页&quot;</li>
+<li>内存数据写入磁盘后，内存和磁盘上的数据页的内容就一致，我们称&quot;干净页&quot;</li>
+<li>脏页与干净页都在内存中</li>
+
+</ul>
+</li>
+<li><p>innodb在什么情况下，会触发刷脏(flush)过程？</p>
+<ul>
+<li>redo log写满了(停止更新操作，checkpoint往前推进，redo log留出空间)</li>
+<li>系统内存不足，需要淘汰脏页</li>
+<li>系统空闲，触发刷脏</li>
+<li>系统正常关闭，触发刷脏</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.4.2 刷脏对系统性能的影响</h4>
+<ul>
+<li><p>明显影响性能的情况？</p>
+<ul>
+<li>redo log写满，更新全部堵住，写性能为零，对敏感性业务不能接受</li>
+<li>一个查询淘汰的脏页个数太多，会导致查询的响应时间明显变长</li>
+
+</ul>
+</li>
+<li><p>缓冲池中内存的三种状态</p>
+<ul>
+<li>没有使用</li>
+<li>使用了的干净页</li>
+<li>使用了的脏页</li>
+
+</ul>
+</li>
+<li><p>读取申请内存不够的淘汰策略</p>
+<ul>
+<li>先淘汰最久不使用的数据页从内存中淘汰</li>
+<li>如果是干净页直接释放复用，如果是脏页，必须先将脏页刷磁盘变成干净页之后再复用</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.4.3 innodb刷脏的控制策略</h4>
+<ul>
+<li><p><code>show variables like &#39;%innodb_io_capacity%&#39;</code></p>
+<ul>
+<li>innodb_io_capacity表示磁盘的能力，建议设置成磁盘的iops</li>
+
+</ul>
+</li>
+<li><p>innodb刷盘速度参考因素</p>
+<ul>
+<li>刷脏比例 <code>innodb_max_dirty_pages_pct</code> 默认75%</li>
+<li>redo log写盘熟读</li>
+
+</ul>
+</li>
+<li><p>查看innodb的脏比</p>
+<ul>
+<li><code>select VARIABLE_VALUE into @a from performance_schema.global_status where VARIABLE_NAME = &#39;Innodb_buffer_pool_pages_dirty&#39;; select VARIABLE_VALUE into @b from performance_schema.global_status where VARIABLE_NAME = &#39;Innodb_buffer_pool_pages_total&#39;; select @a/@b;</code></li>
+
+</ul>
+</li>
+<li><p>innodb连刷机制</p>
+<ul>
+<li><code>show variables like &#39;%innodb_flush_neighbors%&#39;;</code></li>
+<li>会让查询抖动更大，现在磁盘io增大，建议关闭这个</li>
+
+</ul>
+</li>
+<li><p>WAL技术</p>
+<ul>
+<li>将数据库的随机写转成顺序写，大大提升数据库性能</li>
+
+</ul>
+</li>
+
+</ul>
+<h3>2.5 为什么表数据删除一半，表文件不变</h3>
+<h4>2.5.1 表结构的定义与数据存储</h4>
+<ul>
+<li><p>mysql的innodb表包含部分</p>
+<ul>
+<li>表结构定义(8.0可以把表结构定义放在系统数据表中)</li>
+<li>数据</li>
+
+</ul>
+</li>
+<li><p>innodb_file_per_table用来控制表数据存在共享表空间，也可以单独的文件</p>
+<ul>
+<li><p>OFF表示，表数据放在系统共享表空间，也就是跟数据字典放一起</p>
+</li>
+<li><p>ON表示，每个Innodb表数据存储在一个.idb为后缀的文件（建议）</p>
+<ul>
+<li>独立在删除 drop table命令之后，系统可以直接删除文件，空间得到释放</li>
+
+</ul>
+</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.5.2 数据删除的执行流程</h4>
+<ul>
+<li><p>如果删掉一条记录R4</p>
+<ul>
+<li>会标记这个位置为删除，但磁盘文件的大小并不缩小</li>
+<li>如果后面插入的记录会在R4这个位置，会复用这个位置</li>
+
+</ul>
+</li>
+<li><p>如果删掉整个数据页上的所有记录</p>
+<ul>
+<li>这样整个数据页就可以被复用</li>
+<li>数据页复用跟记录复用不同，整个页复用可以存储到任何位置</li>
+
+</ul>
+</li>
+<li><p>相邻两个数据页利用率，页合并操作</p>
+<ul>
+<li>系统会将两个页的数据合并到一个也上，另外一个页就被标记为可复用</li>
+
+</ul>
+</li>
+<li><p>如果使用delete删除数据</p>
+<ul>
+<li>所有的页被标记为可复用，但磁盘上文件大小不变</li>
+<li>也就是说delete不会回收磁盘空间</li>
+<li>实际上不止删除数据会造成空洞，插入数据也会（随机的插入，就可能造成索引数据的分裂）</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.5.3 如何解决磁盘不回收的问题？</h4>
+<ul>
+<li><p>重建表</p>
+<ul>
+<li><code>alter table A engine=Innodb</code></li>
+<li>mysql会自动完成转存数据，交换表名，删除旧表的操作</li>
+
+</ul>
+</li>
+<li><p>重建表的时候，往临时表插入数据，旧表又有数据写入如何解决？</p>
+<ul>
+<li>mysql5.6 引入 online DDL</li>
+<li>建立一个临时文件，扫描表 A 主键的所有数据页；</li>
+<li>用数据页中表 A 的记录生成 B+ 树，存储到临时文件中；</li>
+<li>生成临时文件的过程中，将所有对 A 的操作记录在一个日志文件（row log）中，对应的是图中 state2 的状态；</li>
+<li>临时文件生成后，将日志文件中的操作应用到临时文件，得到一个逻辑数据上与表 A 相同的数据文件，对应的就是图中 state3 的状态；</li>
+<li>用临时文件替换表 A 的数据文件。</li>
+<li>由于日志文件的记录和重放操作功能的存在，在重建表的时候，允许对表A做增删改操作</li>
+<li>注意：会消耗IO和cpu资源</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.5.4 online与inplace的区别</h4>
+<ul>
+<li><p>tmp_table是由server创建的,<code>alter table t engine=innodb,ALGORITHM=copy;</code></p>
+</li>
+<li><p>tmp_file 是由innodb创建的，整个ddl都在innodb内部完成，是一种原地操作</p>
+</li>
+<li><p>tmp_file <code>alter table t engine=innodb,ALGORITHM=inplace;</code></p>
+</li>
+<li><p>给innodb添加全文索引字段过程</p>
+<ul>
+<li><code>alter table t add fulltext(file_name);</code></li>
+<li>这个过程是inplace,但会阻塞增删改操作，非online</li>
+<li>ddl过程如果是online, 则一点是inplace</li>
+<li>反之来未必，添加全文索引(fulltext index) 和 空间索引(spatial index)就属于这种情况</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.5.5 optimize table / analyze table / alter table / truncate区别</h4>
+<ul>
+<li>alter table 是recreate table操作</li>
+<li>analyze table 不是重建建表，只是对索引信息做重新的统计，没有修改数据，这个过程中加MDL读锁</li>
+<li>optimize table 等于 recreate + analyze</li>
+<li>truncate table 等于 drop + create</li>
+
+</ul>
+<h4>2.5.6 思考题？</h4>
+<ul>
+<li><p>进行收缩表，结果占用空间更大</p>
+<ul>
+<li>本来很紧凑</li>
+<li>重新收缩，15/16整理数据，1/16留给update</li>
+<li>未整理之前的页已经占用了90%以上，收缩后，文件反而变大</li>
+
+</ul>
+</li>
+
+</ul>
+<h3>2.7 count(*)这么慢，如何优化？</h3>
+<h4>2.7.1 count(*)实现方式</h4>
+<ul>
+<li><p>innodb与myisam实现的原理</p>
+<ul>
+<li><p>innodb 需要把数据一行一行地从引擎里面读出来，然后累积记数</p>
+</li>
+<li><p>Myisam引擎把表的总行数存在磁盘上</p>
+<ul>
+<li>每次直接返回，效率高，但这是没有过滤条件的count(*)</li>
+
+</ul>
+</li>
+<li><p>innodb引擎为什么不存储多少行数据，方便查询</p>
+<ul>
+<li>由于多版本并发控制(MVCC)的原因，Innodb也不知道返回多少行</li>
+<li>在事务的多个版本读取的行数不同</li>
+
+</ul>
+</li>
+
+</ul>
+</li>
+<li><p>innodb扫描行的优化</p>
+<ul>
+<li>扫描主键索引与其他索引一样，因此会选择扫描最小那棵树来遍历</li>
+<li>在保证逻辑正确的前提下，尽量减少扫描的数据量，是数据库系统设计的通用法则之一。</li>
+
+</ul>
+</li>
+<li><p><code>show table status</code> 的行数是估算出来的</p>
+<ul>
+<li>误差40%-50%</li>
+<li>不能直接替换扫描的行数</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.7.2 经常使用count(*)如何优化</h4>
+<ul>
+<li><p>思路： 找一个地方，记录表的行数</p>
+<ul>
+<li><p>redis缓存起来</p>
+<ul>
+<li>丢失，</li>
+<li>并发数据不精准，并发系统无法控制不同线程执行时刻</li>
+
+</ul>
+</li>
+<li><p>找一个额外表存储起来</p>
+<ul>
+<li>解决丢失问题</li>
+<li>事务隔离的可视性问题</li>
+
+</ul>
+</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.7.3 不同的count逻辑不同问题</h4>
+<ul>
+<li><p>count(*)、count(主键)、count(1)表示返回满足条件的结果集总行数</p>
+</li>
+<li><p>count(字段)，表示满足条件，参数&quot;字段&quot;不为null的总个数</p>
+</li>
+<li><p>执行效率</p>
+<ul>
+<li>count(字段)&lt;count(主键id)&lt;count(1)&lt;count(*)</li>
+<li>count(主键id)需要解析id, 然后判断null, 再累加</li>
+<li>count(1) 不需要解析，只需判断行不为null，然后累积</li>
+<li>count(*) mysql进行优化，认为一定非空，直接按行累积</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.7.5 思考题？从并发性能来看，先插入操作记录还是先更新计数表</h4>
+<ul>
+<li>先插入记录，再更新计数统计表</li>
+<li>更新统计表涉及到行数，先插入再更新能最大程度减少事务之间的锁等待，提高并发度</li>
+
+</ul>
+<h3>2.8 日志与索引的相关问题</h3>
+<ul>
+<li>mysql修改操作redo log 与 binlog的二阶段提交[1.2.3]</li>
+
+</ul>
+<h4>2.8.1 追问二阶段提交</h4>
+<ul>
+<li><p>mysql怎么知道binlog是完整的</p>
+<ul>
+<li>statement格式的binlog, 最后有一个commit</li>
+<li>row格式的binlog, 最后会有一个xid event</li>
+
+</ul>
+</li>
+<li><p>redo log 与 binlog是怎么串联起来的</p>
+<ul>
+<li>通过一个共同的字段 xid</li>
+<li>崩溃恢复的时候，会按顺序扫描redo log</li>
+<li>如果碰到有prepare、commit的redo log直接提交</li>
+<li>如果只有prepare, 没有commit的redo log, 会拿着xid去binlog找对应事务</li>
+
+</ul>
+</li>
+<li><p>处于 prepare 阶段的 redo log 加上完整 binlog，重启就能恢复，MySQL 为什么要这么设计?</p>
+<ul>
+<li>这个策略会 解决主从和备份数据的一致性问题，因为这些操作依赖binlog</li>
+<li>需要保证binlog的完整性</li>
+
+</ul>
+</li>
+<li><p>为什么需要二阶段提交？干脆先 redo log 写完，再写 binlog。崩溃恢复的时候，必须得两个日志都完整才可以。是不是一样的逻辑？</p>
+<ul>
+<li>二阶段提交是经典的分布式系统的问题</li>
+<li>如果直接写redo log, binlog失败，redo log又不能回滚，会造成数据的不一致性</li>
+
+</ul>
+</li>
+<li><p>只保留binlog可以吗？</p>
+<ul>
+<li>不能支持崩溃恢复</li>
+
+</ul>
+</li>
+<li><p>只有redo log可以吗？</p>
+<ul>
+<li>不可以，redo log是一个循环写，会覆盖原来的记录</li>
+<li>没办法起到归档作用</li>
+<li>mysql系统的高可用就是binlog的复用</li>
+
+</ul>
+</li>
+<li><p>redo log一般要设置多大？</p>
+<ul>
+<li>太小，很容易写满，不能不强刷redo log, wal技术发挥不出来</li>
+
+</ul>
+</li>
+<li><p>正常运行中的实例，数据写入后的最终落盘，是从 redo log 更新过来的还是从 buffer pool 更新过来的呢？</p>
+<ul>
+<li>redo log并没有记录数据页的完整数据，没有能力更新数据磁盘页</li>
+<li>脏页的刷新跟redo log没有关系</li>
+<li>崩溃恢复的时候，脏页会丢失，会先将数据读到内存，然后用redo log更新为脏页</li>
+
+</ul>
+</li>
+<li><p>redo log buffer 是什么？是先修改内存，还是先写 redo log 文件？</p>
+<ul>
+<li>redo log buffer是一个内存，先保存redo日志</li>
+<li>真正的日志是redo log file(文件名ib_logfile+数字)，是在commit语句的时候做的</li>
+<li>事务在执行的过程中不会主动刷盘，用来减少io的消耗</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.8.2 思考题，跟新一条相同的数据，mysql如何处理？</h4>
+<ul>
+<li>InnoDB 认真执行了“把这个值修改成 (1,2)&quot;这个操作，该加锁的加锁，该更新的更新。</li>
+<li>主要是事务的隔离性</li>
+
+</ul>
+<h3>2.9 order by的工作原理</h3>
+<ul>
+<li>全字段排序</li>
+<li>rowid排序</li>
+
+</ul>
+<h4>2.9.1 全字段排序</h4>
+<ul>
+<li><p><code>select name,city,age from t5 where city=&quot;hangzhou&quot; order by name limit 100</code>的执行流程</p>
+<ul>
+<li>初始化sort_buffer,确定放入name,city,age这三个字段</li>
+<li>从索引city找到对应的主键id</li>
+<li>到主键id索引回表查询数据，取name,city,age三个字段，存储到sort_buffer</li>
+<li>重复执行索引city, 主键id回表查询</li>
+<li>对sort_buffer进行快速排序【可能在内存】</li>
+<li>按排序的结果取100行返回给客户端</li>
+
+</ul>
+</li>
+<li><p>sort_buffer</p>
+<ul>
+<li>sort_buffer【是mysql为每个线程分配一块内存用于排序】</li>
+<li>通过 <code>show variables like &#39;%sort_buffer_size%&#39;;</code></li>
+<li>如果排序的数据量太大，内存放不下，就会利用磁盘临时文件辅助排序</li>
+
+</ul>
+</li>
+<li><p>怎么判断排序是否使用了临时文件</p>
+<ul>
+<li>number_of_tmp_files 超过需求排序的数据量的大小</li>
+<li>sort_buffer_size 越小，需要分成的份数越多，number_of_tmp_files 的值就越大。</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.9.2 rowid排序</h4>
+<ul>
+<li><p>单行数据很大，返回的数据量很大，一直使用临时文件，</p>
+</li>
+<li><p>mysql对单行长度太大的优化</p>
+<ul>
+<li>初始化 sort_buffer，确定放入两个字段，即 name 和 id；</li>
+<li>从索引 city 找到第一个满足 city=&#39;杭州’条件的主键 id，也就是图中的 ID_X；</li>
+<li>到主键 id 索引取出整行，取 name、id 这两个字段，存入 sort_buffer 中；</li>
+<li>从索引 city 取下一个记录的主键 id；</li>
+<li>重复步骤 3、4 直到不满足 city=&#39;杭州’条件为止，也就是图中的 ID_Y；</li>
+<li>对 sort_buffer 中的数据按照字段 name 进行排序；</li>
+<li>遍历排序结果，取前 1000 行，并按照 id 的值回到原表中取出 city、name 和 age 三个字段返回给客户端。</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.9.3 全字段排序 Vs rowid排序</h4>
+<ul>
+<li><p>选择原理</p>
+<ul>
+<li>如果内存足够大，会优先全字段排序，尽量减少磁盘io</li>
+<li>如果内存太小，会影响排序效率，才会采用rowid排序算法</li>
+<li>对innodb表来说，rowid排序会要求回表多造成磁盘读，因此不会优先选择</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.9.4 如果减少文件排序</h4>
+<ul>
+<li>添加索引(联合索引)，将数据变成有序</li>
+<li><code>alter table t5 add index city_name_age(city, name, age);</code> 联合索引，减少回表查询</li>
+<li>分析 <code>using index</code> 表示使用了覆盖索引，减少了回表查询</li>
+
+</ul>
+<h4>2.9.5 思考题</h4>
+<ul>
+<li><p><code>select * from t where city in (&#39;杭州&#39;,&quot;苏州&quot;) order by name limit 100;</code> 会有排序过程吗</p>
+<ul>
+<li>会</li>
+<li>杭州的name是排好序，苏州的name也是排好序，但是加起来就不满足排序</li>
+
+</ul>
+</li>
+<li><p>如果维护一个数据库端排序的方案，不需要额外排序</p>
+<ul>
+<li>分别查询，归并排序</li>
+
+</ul>
+</li>
+
+</ul>
+<h3>2.10 如何正确显示随机消息</h3>
+<h4>2.10.1 order by rand() 排序随机取几条数据的背后逻辑</h4>
+<ul>
+<li><p><code>select word from words order by rand() limit 3</code> Using temporary(使用临时表); Using filesort(需要排序)</p>
+<ul>
+<li>创建临时表，使用memory引擎，会有两个字段，一个double(存随机数), varchar(存word单词)，表中没有建索引</li>
+<li>按主键取word值，调用rand()函数，将这两个值存在临时表中</li>
+<li>然后将没有索引的临时表按照随机数排序</li>
+<li>初始化sort_buffer, 将临时表的数据扫描添加到sort_buffer中，然后根据随机数排序</li>
+<li>排完序之后取前三条结果返回位置信息，这样就可以直接从内存中取出word值</li>
+<li><code>show variables like &#39;%slow_query_log%&#39;;</code> 查看慢日志看扫描的行数</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.10.2 mysql如何定位一行数据？</h4>
+<ul>
+<li><p>没有主键如何回表</p>
+<ul>
+<li><p>删掉主键，mysql会自己生成一个长度为6字节的rowid来作为主键</p>
+</li>
+<li><p>排序过程中rowid的来历，标识数据行的信息</p>
+<ul>
+<li>没有主键，rowid是系统生成，有主键，rowid就是主键id</li>
+<li>memory引擎不是索引组织表，可以认为是一个数组，rowid就是数组的下标</li>
+
+</ul>
+</li>
+
+</ul>
+</li>
+<li><p>总结order by rand()</p>
+<ul>
+<li>使用了内存临时表</li>
+<li>内存临时表排序的时候使用了rowid排序方法</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.10.3 磁盘临时表</h4>
+<ul>
+<li><p>什么时候会使用</p>
+<ul>
+<li>数据超过 tmp_table_size的限制，就会使用磁盘临时表， 默认16M</li>
+<li><code>show variables like &#39;%tmp_table_size%&#39;;</code></li>
+<li>磁盘临时表使用的引擎是innodb, 用<code>internal_tmp_dist_storage_engine</code>控制</li>
+<li>使用磁盘临时表就是一个没有显示索引的innodb表排序过程</li>
+
+</ul>
+</li>
+<li><p>为什么临时文件排序使用优先队列排序？而不是归并排序算法</p>
+<ul>
+<li>使用优先队列就可以只得到前3个，不需要排所有的</li>
+
+</ul>
+</li>
+<li><p>优先队列排序算法</p>
+<ul>
+<li>对于这 10000 个准备排序的 (R,rowid)，先取前三行，构造成一个堆；</li>
+<li>取下一个行 (R’,rowid’)，跟当前堆里面最大的 R 比较，如果 R’小于 R，把这个 (R,rowid) 从堆中去掉，换成 (R’,rowid’)；</li>
+<li>重复第 2 步，直到第 10000 个 (R’,rowid’) 完成比较。</li>
+<li>总是保证堆顶最大值</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.10.4 如果优化随机排序算法？</h4>
+<ul>
+<li><p>思路1</p>
+<ul>
+<li>取得这个表的主键 id 的最大值 M 和最小值 N;</li>
+<li>用随机函数生成一个最大值到最小值之间的数 X = (M-N)*rand() + N;</li>
+<li>取不小于 X 的第一个 ID 的行。</li>
+<li>问题：空洞问题，会取不到值，概率不均衡</li>
+
+</ul>
+</li>
+<li><p>思路2</p>
+<ul>
+<li>取得整个表的行数，并记为 C</li>
+<li>取得 Y = floor(C * rand())。 floor 函数在这里的作用，就是取整数部分。</li>
+<li>再用 limit Y,1 取得一行。</li>
+<li>注意：mysql处理limit的做法就是按顺序一个一个读出来，丢掉前Y个，然后把一个记录作为返回结果，因此需要扫描y+c+1行，代价相对高一些</li>
+
+</ul>
+</li>
+<li><p>取三个值的随机算法</p>
+<ul>
+<li>取得整个表的行数，记为 C；</li>
+<li>根据相同的随机方法得到 Y1、Y2、Y3；</li>
+<li>再执行三个 limit Y, 1 语句得到三行数据。</li>
+
+</ul>
+</li>
+<li><p>思路3</p>
+<ul>
+<li><code>select * from words where id &gt;= (select floor(rand()*(select max(id) from words))) order by id limit 10;</code></li>
+<li>单词全部取出，使用redis缓存排序来处理业务，尽量不要让数据库做业务逻辑</li>
+<li>可以重建索引解决空洞问题</li>
+
+</ul>
+</li>
+
+</ul>
+<h3>2.11 为什么mysql逻辑相同，性能差异这么大？</h3>
+<h4>2.11.1 条件字段函数操作</h4>
+<ul>
+<li><p><code>select count(*) from trade_log where month(t_modified)=7</code> t_modified上有索引</p>
+<ul>
+<li>不会走索引</li>
+<li><code>select * from words where id-1=999;</code> 索引失效</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.11.2 隐式类型转换</h4>
+<ul>
+<li><p><code>select &quot;10&quot;&gt;9</code> 如果等于1,说明字符串转成了int, 否则int转成了字符串</p>
+</li>
+<li><p><code>explain select * from tradelog where tradeid=3423422</code> tradeid有索引且类型为varchar(32)</p>
+<ul>
+<li>会发生隐式类型转换，这样索引就会失效就会扫描全表</li>
+<li>对优化器执行的代码如下 <code>select * from tradelog where CAST(tradid AS signed int) = 110717;</code></li>
+<li>也就是对索引字段操作，优化器会放弃走树搜索功能</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.11.3 隐式字符编码转换</h4>
+<ul>
+<li><p>关联表，一个是utf8, 一个是utf8mb4</p>
+</li>
+<li><p><code>select * from trade_detail where tradeid=$L2.tradeid.value;</code></p>
+<ul>
+<li>实际触发隐式转换 <code>select * from trade_detail  where CONVERT(traideid USING utf8mb4)=$L2.tradeid.value;</code></li>
+<li>连接过程中要求在被驱动表的索引字段上加函数操作，直接导致全表查询</li>
+
+</ul>
+</li>
+<li><p>如果解决字符串转换问题</p>
+<ul>
+<li>将表的字符集修改成相同</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.11.4 另外慢查询场景</h4>
+<ul>
+<li><p>100万数据的表，有一个b字段，int(10), 其中等于1234567890的数据有10万条</p>
+<ul>
+<li><code>select * from t where b =&quot;1234567890abcd&quot;;</code> 这个查询的执行流程，会走索引吗？</li>
+<li>在传给引擎执行的时候，做了字符截断。因为引擎里面这个行只定义了长度是 10，所以只截了前 10 个字节，就是’1234567890’进去做匹配；</li>
+<li>这样满足条件的数据有 10 万行；</li>
+<li>因为是 select *， 所以要做 10 万次回表；</li>
+<li>但是每次回表以后查出整行，到 server 层一判断，b 的值都不是’1234567890abcd’;</li>
+<li>返回结果是空。</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.11.4 总结</h4>
+<ul>
+<li>对索引字段做函数操作，可能破坏索引值的有序性，因此优化器就决定放弃走树搜索功能</li>
+<li>业务代码升级，执行explain是一个很好的习惯</li>
+
+</ul>
+<h3>2.12 为什么查一行语句，也执行这么慢？</h3>
+<h4>2.12.1 等到MDL锁</h4>
+<ul>
+<li><p>查询长时间不返回</p>
+<ul>
+<li><code>show processlist</code> 查看waiting for table metadata lock</li>
+<li>一个线程正在表t上请求或持有MDL写锁，把select语句堵住了</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.12.2 等flush</h4>
+<ul>
+<li><p><strong>flush表的动作</strong></p>
+<ul>
+<li><code>flush tables words with read lock;</code> 和 <code>flush tables with read lock;</code></li>
+<li>flush表动作-&gt;关闭已打开的表对象，同时将查询缓存中的结果清空（会等到所有正在运行的sql请求）</li>
+
+</ul>
+</li>
+<li><p>产生阻塞的流程</p>
+<ul>
+<li><code>select sleep(1) from words;</code> 默认要执行10万秒</li>
+<li><code>flush tables words</code> 需要关闭查询对象，就需要等待上一个结束，因此会阻塞</li>
+<li><code>select * from words where id =1</code> 也会被阻塞，被flush命令阻塞</li>
+<li><code>show processlist</code> 会出现 waiting for table flush</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.12.3 等行锁</h4>
+<ul>
+<li><p>场景复现</p>
+<ul>
+<li>session A <code>begin; update words set word=&quot;adad&quot; where id =1;</code></li>
+<li>session B <code>select * from words where id=1 lock in share mode;</code></li>
+<li>session A启动事务，占用写锁，但未提交</li>
+<li>session B查询需要获取读锁</li>
+
+</ul>
+</li>
+<li><p>如果解决</p>
+<ul>
+<li>找到对应的查询线程, 断开这个链接</li>
+<li>链接被断开的时候，会自动回滚这个连接里面正在执行的线程，也就释放了id=1的行锁</li>
+<li><code>show processlist; kill query processlist_id;</code></li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.12.4 慢查询</h4>
+<ul>
+<li><p>没有索引，只是一条条扫描</p>
+<ul>
+<li><code>select * from t where c=50000 limit 1;</code></li>
+<li>可以看慢查询扫描的行数</li>
+<li>坏查询不一定是慢查询，线上一般超过1ms都不是好查询</li>
+
+</ul>
+</li>
+<li><p>回滚日志太多，导致查询时间差的问题</p>
+<ul>
+<li>session B 执行10万次 <code>update words set c=c+1 where id=1;</code></li>
+<li>session A <code>select * from words where id =1;</code> 会执行10次的回滚日志，所以比较耗时 </li>
+<li>session A <code>select * from words where id =1 lock in share mode;</code></li>
+<li><code>lock in share mode</code> 表示当前读，会直接读到结果不需要执行回滚日志</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.12.5 总结</h4>
+<ul>
+<li><p>概念</p>
+<ul>
+<li>表锁</li>
+<li>行锁</li>
+<li>一致性读 <code>lock in share mode</code></li>
+
+</ul>
+</li>
+<li><p>思考题？</p>
+<ul>
+<li><code>select * from t where c= 5 for update;</code> 会等待行锁释放之后，返回查询结果</li>
+<li><code>select * from t where c=5 for update nowait</code> 不等待，直接提示锁冲突，不返回结果</li>
+<li><code>select * from t where c=5 for update wait 5</code> 等待5秒，如果行锁仍未释放，则提示行锁冲突，不返回结果</li>
+<li><code>select * from t where c=5 for update skip locked</code> 直接返回结果，忽略行锁记录</li>
+
+</ul>
+</li>
+
+</ul>
+<h3>2.13 幻读是什么？幻读有什么问题？</h3>
+<h4>2.13.1 幻读是什么？</h4>
+<ul>
+<li><p>一个事务在前后两次查询同一范围的时候，后一次查询看到前一次查询没有看到的行</p>
+<ul>
+<li>在rr级别下，普通查询时快照读，看不到别的事务插入的数据，因此，幻读在&quot;当前读&quot;才会出现</li>
+<li>修改不能称为幻读，幻读专指&quot;新插入的行&quot;</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.13.2 幻读有什么问题？</h4>
+<h4>2.13.3 如何解决幻读？</h4>
+<ul>
+<li><p>间隙锁（Gap lock）只有在rr隔离级别下才生效</p>
+<ul>
+<li>产生幻读的原因是，行锁只能锁住行</li>
+<li>新插入记录这个动作，要更新的事记录之间的&quot;间隙&quot;</li>
+<li>锁的就是两个值之间的空隙</li>
+
+</ul>
+</li>
+<li><p><code>select * from t where d=5 for update</code>背后的逻辑</p>
+<ul>
+<li>不光锁住数据库已有的记录(n)个行锁</li>
+<li>还同时增加(n+1)个间隙锁，这样确保无法再插入新的记录</li>
+
+</ul>
+</li>
+<li><p>间隙锁和行锁合成 next-key lock</p>
+<ul>
+<li>next-key lock 是一个前开后闭的区间</li>
+<li>间隙锁为开区间，next-key lock为前开后闭区间</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.13.4 锁的冲突关系</h4>
+<ul>
+<li><p>读锁/写锁</p>
+<ul>
+<li>读锁与写锁冲突</li>
+<li>写锁与写锁冲突</li>
+<li>读锁与读锁不冲突</li>
+
+</ul>
+</li>
+<li><p>间隙锁(gap lock)</p>
+<ul>
+<li>间隙锁之间不存在冲突关系</li>
+<li>间隙锁与往这个间隙插入一个记录存在冲突关系</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.13.5 思考</h4>
+<ul>
+<li><p>rc模式，binlog_format=row组合为啥要这样用</p>
+<ul>
+<li>row模式下保存的是每一行的前后记录，虽然占空间，但是不会因为保存命令而造成幻读</li>
+
+</ul>
+</li>
+<li><p>即使给所有的行加锁也解决不了幻读的影响</p>
+</li>
+<li><p>行锁确实比较直观，判断规则也相对简单，间隙锁的引入会影响系统的并发度，也增加了锁分析的复杂度</p>
+</li>
+
+</ul>
+<h3>2.14 为什么我只改变一行，锁这么多？</h3>
+<h4>2.14.1 rr级别下，加锁的规则（两原则，两优化，一bug）</h4>
+<ul>
+<li><p>5.x-5.7.24, 8.0-8.0.13版本中的情况</p>
+<ul>
+<li>原则1: 加锁的基本单位是next-key lock, 是前开后闭区间</li>
+<li>原则2: 查找过程中访问到的对象才会加锁</li>
+<li>优化1: 索引上的等值查询，给唯一索引加锁时，next-key lock退化为行锁</li>
+<li>优化2: 索引上的等值查询，向右遍历时且最后一个值不满足等值条件的时候，next-key lock 退化为间隙锁</li>
+<li>一个bug: 唯一索引上的范围查询会访问到不满足条件的第一个值为止</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.14.2 各种案例分析</h4>
+<ul>
+<li>等值查询间隙锁
+<img src="images/幻读/1.png" referrerpolicy="no-referrer"></li>
+<li>非唯一索引等值锁
+<img src="images/幻读/2.png" referrerpolicy="no-referrer"></li>
+<li>主键索引范围锁
+<img src="images/幻读/3.png" referrerpolicy="no-referrer"></li>
+<li>非唯一索引范围锁
+<img src="images/幻读/4.png" referrerpolicy="no-referrer"></li>
+<li>唯一索引范围锁bug
+<img src="images/幻读/5.png" referrerpolicy="no-referrer"></li>
+<li>非唯一索引上存在&quot;等值&quot;的例子
+<img src="images/幻读/6.png" referrerpolicy="no-referrer"></li>
+<li>limit语句加锁
+<img src="images/幻读/7.png" referrerpolicy="no-referrer"></li>
+<li>一个死锁的例子
+<img src="images/幻读/8.png" referrerpolicy="no-referrer"></li>
+
+</ul>
+<h3>2.15 mysql有哪些&quot;饮鸩止渴&quot;提高性能的方法？</h3>
+<h4>2.15.1 短连接风暴</h4>
+<ul>
+<li><p>短连接模型存在的风险</p>
+<ul>
+<li>一旦数据库处理的慢一些，连接数就会暴涨</li>
+<li>通过参数max_connections来查看最大的连接数</li>
+<li>查看现有的mysql连接 <code>select * from information_schema.processlist;</code></li>
+<li><code>kill id;</code> 即可删掉连接</li>
+
+</ul>
+</li>
+<li><p>处理的方式</p>
+<ul>
+<li><p>第一种：先处理掉那些占着连接但是不工作的线程 <code>kill id</code></p>
+</li>
+<li><p>第二种：减少连接过程的消耗</p>
+<ul>
+<li>短时间大量的连接申请，跳过权限验证阶段, 重启加上参数 --skip-grant-tables</li>
+<li>开启--skip-grant-tables参数，mysql默认会开启skip-networking参数，只能被本地客户端连接</li>
+
+</ul>
+</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.15.2 慢查询的性能问题</h4>
+<ul>
+<li><p>索引没有设计好</p>
+<ul>
+<li><p>修改索引执行 alter table语句</p>
+</li>
+<li><p>理解做法： </p>
+<ul>
+<li>从库关闭 set sql_log_bin=off, 然后alter table添加索引</li>
+<li>切换主从设备</li>
+<li>在原来的主库执行set sql_log_bin=off, 修改alter table添加索引</li>
+
+</ul>
+</li>
+
+</ul>
+</li>
+<li><p>sql语句没有写好</p>
+<ul>
+<li><code>select * from t where id+1=1000;</code> 修改sql</li>
+
+</ul>
+</li>
+<li><p>mysql选错索引</p>
+<ul>
+<li>force index 强制指定索引</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.15.3 如何提前发现索引没设计好和语句没有写好</h4>
+<ul>
+<li>测试环境开启慢sql, 设置 long_query_time=0, 确保每个语句记录都写到慢日志</li>
+<li>测试表中模拟线上做回归测试</li>
+<li>观察慢日志，留意rows_examined字段师傅与预期一致</li>
+<li><a href='https://www.percona.com/doc/percona-toolkit/3.0/pt-query-digest.html'>慢日志分析工具</a></li>
+
+</ul>
+<h4>2.15.4 Qps突增问题</h4>
+<ul>
+<li><p>业务突然出现高峰，或者应用程序bug, 导致某个语句qps突然暴涨</p>
+<ul>
+<li>一种由全新业务的bug导致的，直接去掉这个功能</li>
+<li>如果新业务使用新的数据库，直接删掉账号，断开现有的连接</li>
+<li>如果这个功能跟现有的主体部署一起，只能通过处理语句来限制</li>
+
+</ul>
+</li>
+
+</ul>
+<h3>2.16 mysql怎么保证数据不丢失</h3>
+<ul>
+<li><p>重要结论</p>
+<ul>
+<li>只要redo log和binlog保证持久化到磁盘，就能确保mysql异常重启后，数据可以恢复</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.16.1 binlog的写入机制</h4>
+<ul>
+<li><p>写入逻辑</p>
+<ul>
+<li>事务执行中，先把日志写入到binlog cache, </li>
+<li>事务提交的时候，将binlog cache写入到binlog磁盘文件中</li>
+<li>一个事务的binlog不能被拆分，无论事务多大，都要保证一次性写入</li>
+
+</ul>
+</li>
+<li><p>binlog cache</p>
+<ul>
+<li>每个线程一片内存，<code>show variables like &#39;%binlog_cache_size%&#39;</code> 查看大小</li>
+<li>如果超过这个大小就要暂存到磁盘中</li>
+<li>事务提交将binlog cache写入文件中，会清空binlog cache的缓存</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.16.2 binlog写盘分析</h4>
+<p><img src="./images/binlog/binlog_write_disk.png" referrerpolicy="no-referrer"></p>
+<ul>
+<li><p>分析</p>
+<ul>
+<li>图中的 write，指的就是指把日志写入到文件系统的 page cache，并没有把数据持久化到磁盘，所以速度比较快。</li>
+<li>图中的 fsync，才是将数据持久化到磁盘的操作。一般情况下，我们认为 fsync 才占磁盘的 IOPS。</li>
+
+</ul>
+</li>
+<li><p>write 和 fsync的时机，由参数 <code>show variables like &#39;%sync_binlog%&#39;;</code> 控制</p>
+<ul>
+<li>0，表示每次提交事务都只write， 不fsync</li>
+<li>1，表示每次提交事务都会 fsync</li>
+<li>N(n&gt;1) 表示累积N个事务提交之后，才fsync</li>
+
+</ul>
+</li>
+<li><p>性能优化</p>
+<ul>
+<li>sync_binlog设置一个比较大的值，可以提升性能，解决一定的io问题</li>
+<li>一般在100-1000之间</li>
+<li>对应的风险：如果主机异常重启，会丢失最近N个事务的binlog日志</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.16.3 redo log的写入机制</h4>
+<p><img src="./images/redolog/1.png" referrerpolicy="no-referrer"></p>
+<ul>
+<li><p>三种状态分析</p>
+<ul>
+<li>存redo log buffer中，物理上再mysql进程内存中，是红色部分</li>
+<li>写到磁盘(write), 但没有持久化(fsync), 物理上是文件系统的page cache里面，是黄色部分</li>
+<li>持久化到磁盘，对应hard dist, 对应绿色部分</li>
+<li>写日志redo log buffer很快，write到page cache也差不多，持久化磁盘速度就慢很多</li>
+
+</ul>
+</li>
+<li><p>控制redo log 的写策略</p>
+<ul>
+<li><code>show variables like &#39;%innodb_flush_log_at_trx_commint%&#39;;</code></li>
+<li>0, 每次事务提交，只把redo log 写到redo log buffer</li>
+<li>1, 每次事务提交，都讲redo log 直接持久化到磁盘</li>
+<li>2, 表示每次事务提交时都只是把redo log 写到page cache</li>
+<li>注意：innodb有一个后台线程，每隔1秒，就会把redo log buffer中的日志，调用write写到文件系统重的page cache, 然后调用fsync持久化到磁盘</li>
+
+</ul>
+</li>
+<li><p>额外场景，将一个没有提交的事务redo log写入到磁盘</p>
+<ul>
+<li>redo log buffer占用的空间即将达到 <code>show variables like &#39;%innodb_log_buffer_size%&#39;;</code> 的一半时候，后台线程会主动写盘</li>
+<li>并行的事务提交的时候，顺带将这个事务的redo log buffer持久化到磁盘</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.16.4 组提交机制(group commit)</h4>
+<ul>
+<li><p>目的</p>
+<ul>
+<li>减少IOPS消耗</li>
+<li>将多个事务的redo log一起写入到磁盘</li>
+
+</ul>
+</li>
+<li><p>参数控制</p>
+<ul>
+<li><code>show variables like &#39;%binlog_group_commit_sync_delay%&#39;;</code> 表示延迟多少微妙之后才调用fsync</li>
+<li><code>show variables like &#39;%binlog_group_commit_sync_no_delay_count</code> 表示积累多少次以后才调用</li>
+<li>两者是或关系，只要一个满足条件就是会调用fsync</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.16.5 WAL机制</h4>
+<ul>
+<li><p>性能优化点</p>
+<ul>
+<li>redo log 和 binlog 都是顺序写，磁盘的顺序写比随机写速度要快</li>
+<li>组提交机制，可以大幅度降低磁盘的IOPS消耗</li>
+
+</ul>
+</li>
+<li><p>mysql性能IO上的优化</p>
+<ul>
+<li>修改组提交参数，减少binlog写盘次数, 增加响应时间</li>
+<li>修改<code>sync_binlog</code> 参数，多次才进行一次fsync，丢失binlog</li>
+<li>修改 <code>innodb_flush_log_at_trx_commit</code>参数，每次事务都不进行fsync, 丢失binlog</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.16.6 思考题</h4>
+<ul>
+<li><p>执行update语句，使用<code>hexdump</code> 命令查看ibd文件内容，没有看到数据的改变</p>
+<ul>
+<li>有可能WAL机制，只保证了redo log, 内存，还没来得及同步到磁盘</li>
+
+</ul>
+</li>
+<li><p>为什么binlog cache事每个线程自己维护，redo log buffer是全局共用？</p>
+<ul>
+<li>设计原因，binlog是不能&quot;被打断&quot;，一个事务的binlog必须连续写，因此要整个事务完成后，再一起写到文件里</li>
+<li>redo log并没有这个要求，中间生成的日志可以写到redo log buffer中</li>
+<li>redo log中的内容还可以进行组提交，其他事务的内容，一起被写到磁盘</li>
+
+</ul>
+</li>
+<li><p>事务执行期间，还没到提交阶段，如果发生crash, redo log肯定丢了，这会不会导致主备不一致？</p>
+<ul>
+<li>不会，因为这时候binlog还在binlog cache里，还没发送给备库</li>
+<li>crash以后，redo log 和binlog都没有，从业务的角度这个事务也没有提交，所以数据一致</li>
+
+</ul>
+</li>
+<li><p>如果binlog写盘以后发生crash, 这时候还没给客户端答复就重启了，等客户端再重连进来，发现事务已提交成功了，这是不是bug?</p>
+<ul>
+<li><p>不是</p>
+</li>
+<li><p>实际上数据库crash-safe保证的是</p>
+<ul>
+<li>如果客户端收到实物成功的消息，事务就一定持久化</li>
+<li>如果客户端收到实物失败(主键冲突，回滚等)的消息，事务就一定失败</li>
+<li>如果客户端收到执行异常的消息，应用需要重连后通过查询当前状态来继续后续的逻辑，此时数据库只需要保证内部(数据和日志之间，主从之间)一致就可以了</li>
+
+</ul>
+</li>
+
+</ul>
+</li>
+<li><p>你生产设置的&quot;双1&quot;吗？如果平时，你有什么场景改成过&quot;非双1&quot;吗？你的这种操作又基于决定？</p>
+<ul>
+<li>业务高峰期。有可预知的高峰期，DBA会有预案</li>
+<li>备库延迟为了让备库尽快赶上主库</li>
+<li>用备份护肤主库的副本</li>
+<li>批量导入数据</li>
+<li>注意：一般设置 <code>set innodb_flush_logs_at_trx_commit=2;</code> <code>set sync_binlog=2</code></li>
+
+</ul>
+</li>
+
+</ul>
+<h3>2.17 mysql怎么保证主备一致性？</h3>
+<h4>2.17.1 主备的基本原理</h4>
+<p><img src="./images/主从/1.png" referrerpolicy="no-referrer"></p>
+<ul>
+<li><p>分析流程</p>
+<ul>
+<li>主库A内部有一个线程，专门用于服务备库B的这个长连接</li>
+<li>从库通过<code>change master</code>命令，设置主库IP、端口、账号、密码，以及从那个位置开始请求binlog(文件名，偏移量)</li>
+<li>从库执行<code>start slave</code>命令，会启动io_thread、sql_thread线程，其中io线程与主库建立连接</li>
+<li>主库校验账号密码之后，开始按照备库B传过来的位置，从本地读取binlog发送给B</li>
+<li>从库拿到binlog,写到本地文件，称为中转日志(relay log)</li>
+<li>sql_thread读取中转日志，解析出日志里的命令，并执行， sql_thread是多线程</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.17.2 binlog的三种格式对比</h4>
+<ul>
+<li><p><code>set binlog_format=statement;</code> 记录sql语句的原文</p>
+<ul>
+<li><p><code>mysql-&gt; show binlog events in &#39;binlog.000001;</code></p>
+</li>
+<li><p><code>mysqlbinlog binlog.000001 --base64-output=decode-rows -v | more</code></p>
+<ul>
+<li>--base64-output 控制输出格式base64编码</li>
+<li>decode-rows 把基于行的事件解码成一个sql语句</li>
+
+</ul>
+</li>
+
+</ul>
+</li>
+<li><p><code>set binlog_format=row;</code> 记录真实操作的数据</p>
+<ul>
+<li>主备不会存在语义歧视，记录真正操作的主机id与数据</li>
+<li>缺点：删除10万数据，需要记录10万条记录到binlog中，消耗IO,影响执行速度</li>
+
+</ul>
+</li>
+<li><p><code>set binlog_format=mixed</code> 混合格式，两种都存在</p>
+<ul>
+<li>mysql会自己判断这条数据会不会引起主备一致性，如果有可能，就会使用row格式，否则用statement</li>
+<li>mixed即可利用statement格式的优点，同时避免了数据不执行的风险</li>
+<li>时间函数 now()是否会导致主从一致性的问题，如果是statement格式的话</li>
+
+</ul>
+</li>
+<li><p>如果解析binlog日志内容发生给mysql</p>
+<ul>
+<li><code>mysqlbinlog binlog.000001  --start-position=2738 --stop-position=2973 | mysql -h127.0.0.1 -P13000 -u$user -p$pwd;</code></li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.17.3 循环复制问题</h4>
+<p><img src="./images/主从/2.png" referrerpolicy="no-referrer"></p>
+<ul>
+<li><p>分析，节点A与节点B互为主从，切换时，binlog是否会被不断循环执行</p>
+<ul>
+<li>从节点 A 更新的事务，binlog 里面记的都是 A 的 server id；</li>
+<li>传到节点 B 执行一次以后，节点 B 生成的 binlog 的 server id 也是 A 的 server id；</li>
+<li>再传回给节点 A，A 判断到这个 server id 与自己的相同，就不会再处理这个日志。所以，死循环在这里就断掉了。</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.17.4 思考mysql其他高可用方案</h4>
+<ul>
+<li>多节点</li>
+<li>半同步</li>
+<li>Mysql group replication</li>
+
+</ul>
+<h3>2.18 mysql怎么保证高可用？</h3>
+<h4>2.18.1 主备延迟</h4>
+<ul>
+<li><p>延迟的可能情况</p>
+<ul>
+<li>运维动作(软件升级，主库所在机器按计划下线)</li>
+<li>主库所在机器掉电</li>
+
+</ul>
+</li>
+<li><p>如果查看主从延迟时间</p>
+<ul>
+<li><p>从库执行 <code>show slave status</code> 其中 seconds_behind_master 表示当前从库延迟了多少秒</p>
+</li>
+<li><p>seconds_behind_master的计算方法</p>
+<ul>
+<li>每个事务binlog里面都有一个时间字段，用于记录主库的写入时间</li>
+<li>备库取当前事务执行的时间字段，计算与系统的差，得到seconds_behind_master</li>
+<li>精度是秒</li>
+<li>不会受系统的时间不一致影响，会自动扣减系统的时间差</li>
+
+</ul>
+</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.18.2 主备延迟的来源</h4>
+<ul>
+<li><p>从库机器的性能要比主库所在的机器性能差</p>
+<ul>
+<li>多主一从(现在很少)，因为现在需要主从切换</li>
+
+</ul>
+</li>
+<li><p>备库压力大</p>
+<ul>
+<li><p>从库提供读能力，备运营使用，导致消耗大量cpu资源，影响主备延迟</p>
+</li>
+<li><p>解决方案</p>
+<ul>
+<li>一主多从，分担读压力</li>
+<li>binlog输出到外部系统，比如Hadoop, 让外部系统提供统计类查询能力</li>
+
+</ul>
+</li>
+
+</ul>
+</li>
+<li><p>大事务</p>
+<ul>
+<li>主库必须等待事务执行完才会写入binlog, 再传给备库</li>
+<li>一次性删除太多的数据，典型的大事务</li>
+<li>大表的DDL， 也是大事务场景 </li>
+
+</ul>
+</li>
+<li><p>备库的并行复制能力</p>
+</li>
+
+</ul>
+<h4>2.18.3 主从切换的策略</h4>
+<ul>
+<li>可靠性优先策略</li>
+<li>可用性优先策略</li>
+
+</ul>
+<h4>2.18.4 可靠性优先策略</h4>
+<p><img src="./images/主从/3.png" referrerpolicy="no-referrer"></p>
+<ul>
+<li><p>切换流程</p>
+<ul>
+<li>判断备库 B 现在的 seconds_behind_master，如果小于某个值（比如 5 秒）继续下一步，否则持续重试这一步；</li>
+<li>把主库 A 改成只读状态，即把 readonly 设置为 true；</li>
+<li>判断备库 B 的 seconds_behind_master 的值，直到这个值变成 0 为止；</li>
+<li>把备库 B 改成可读写状态，也就是把 readonly 设置为 false；</li>
+<li>把业务请求切到备库 B。</li>
+
+</ul>
+</li>
+<li><p>注意事项</p>
+<ul>
+<li>切换有不可用时间，中间过程系统都在readonly状态，表示系统不可写</li>
+<li>尽量保证seconds_behind_master值足够小</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.18.5 可用性优先策略</h4>
+<ul>
+<li><p>代价：可能造成数据不一致性</p>
+</li>
+<li><p>binlog_format=mixed的场景
+<img src="./images/主从/4.png" referrerpolicy="no-referrer"></p>
+<ul>
+<li>步骤 2 中，主库 A 执行完 insert 语句，插入了一行数据（4,4），之后开始进行主备切换。</li>
+<li>步骤 3 中，由于主备之间有 5 秒的延迟，所以备库 B 还没来得及应用“插入 c=4”这个中转日志，就开始接收客户端“插入 c=5”的命令。</li>
+<li>步骤 4 中，备库 B 插入了一行数据（4,5），并且把这个 binlog 发给主库 A。</li>
+<li>步骤 5 中，备库 B 执行“插入 c=4”这个中转日志，插入了一行数据（5,4）。而直接在备库 B 执行的“插入 c=5”这个语句，传到主库 A，就插入了一行新数据（5,5）。</li>
+
+</ul>
+</li>
+<li><p>binlog_format=row的场景
+<img src="./images/主从/5.png" referrerpolicy="no-referrer"></p>
+</li>
+<li><p>因为 row 格式在记录 binlog 的时候，会记录新插入的行的所有字段值，所以最后只会有一行不一致。而且，两边的主备同步的应用线程会报错 duplicate key error 并停止。也就是说，这种情况下，备库 B 的 (5,4) 和主库 A 的 (5,5) 这两行数据，都不会被对方执行。</p>
+</li>
+<li><p>结论</p>
+<ul>
+<li>使用 row 格式的 binlog 时，数据不一致的问题更容易被发现。而使用 mixed 或者 statement 格式的 binlog 时，数据很可能悄悄地就不一致了。如果你过了很久才发现数据不一致的问题，很可能这时的数据不一致已经不可查，或者连带造成了更多的数据逻辑不一致。</li>
+<li>主备切换的可用性优先策略会导致数据不一致。因此，大多数情况下，我都建议你使用可靠性优先策略。毕竟对数据服务来说的话，数据的可靠性一般还是要优于可用性的。</li>
+
+</ul>
+</li>
+<li><p>建议优先选择可靠性优先策略</p>
+</li>
+
+</ul>
+<h4>2.18.6 思考</h4>
+<ul>
+<li><p>运维系统</p>
+<ul>
+<li>做从库延迟监控 <code>show slave status</code> 采集 seconds_behind_master值</li>
+
+</ul>
+</li>
+
+</ul>
+<h3>2.19 备库为啥延迟好几个小时？</h3>
+<h4>2.19.1 产生的原因</h4>
+<ul>
+<li>如果备库执行日志的速度持续低于主库生成日志的速度，那么延迟可能是小时级别</li>
+<li>对于一个压力比较高的主库来说，备库很有可能永远也追不上主库</li>
+
+</ul>
+<h4>2.19.2 并行复制模型</h4>
+<p><img src="./images/主从/6.png" referrerpolicy="no-referrer"></p>
+<ul>
+<li><p>worker数量如何控制</p>
+<ul>
+<li><code>show variables like &#39;%slave_parallel_workers%&#39;;</code> 一般为机器的1/4-1/2核</li>
+
+</ul>
+</li>
+<li><p>coordinator在分发任务应遵循的原则</p>
+<ul>
+<li>不能造成更新覆盖。也就是更新同一行的两个事务，必须背分派到同一个worker中</li>
+<li>同一个事物不能被拆分，必须放到同一个worker中</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.19.3 并行复制的分发策略</h4>
+<ul>
+<li><p>mysql5.6 </p>
+<ul>
+<li>按库并行</li>
+<li>优势：hash值很快，只需要库名，不要求binlog的格式</li>
+<li>缺点：主库的数据都放在同一DB,策略就会失效</li>
+
+</ul>
+</li>
+<li><p>mariaDB的并行策略</p>
+<ul>
+<li><p>利用redo log的组提交优化</p>
+<ul>
+<li>在同一组提交的事务，一定不会修改同一行</li>
+<li>主库上可以并行执行的事务，备库也一定可以并行执行</li>
+
+</ul>
+</li>
+<li><p>实现的流程</p>
+<ul>
+<li>在一组里面一起提交的事务，有一个相同的 commit_id，下一组就是 commit_id+1；</li>
+<li>commit_id 直接写到 binlog 里面；</li>
+<li>传到备库应用的时候，相同 commit_id 的事务分发到多个 worker 执行；</li>
+<li>这一组全部执行完成后，coordinator 再去取下一批。</li>
+
+</ul>
+</li>
+<li><p>存在的问题</p>
+<ul>
+<li>第二组事务开始之前，必须等待第一组事务完全执行完成后</li>
+
+</ul>
+</li>
+
+</ul>
+</li>
+<li><p>mysql5.7</p>
+<ul>
+<li><p><code>show variables like &#39;%slave-parallel-type%&#39;;</code></p>
+<ul>
+<li>配置DATABASE 表示按库并行</li>
+<li>配置LOGICAL_CLOCK, 类似mariaDB</li>
+<li>将commit表示锁的通过，其实在prepare已经通过</li>
+
+</ul>
+</li>
+<li><p>并行的核心思想【针对前面的优化】</p>
+<ul>
+<li>时处于 prepare 状态的事务，在备库执行时是可以并行的；</li>
+<li>处于 prepare 状态的事务，与处于 commit 状态的事务之间，在备库执行时也是可以并行的。</li>
+
+</ul>
+</li>
+
+</ul>
+</li>
+<li><p>mysql5.7.22</p>
+<ul>
+<li><p>commit_order</p>
+<ul>
+<li>根据同时进入 prepare 和 commit 来判断是否可以并行的策略。</li>
+
+</ul>
+</li>
+<li><p>writeset</p>
+<ul>
+<li>表示的是对于事务涉及更新的每一行，计算出这一行的 hash 值，组成集合 writeset。如果两个事务没有操作相同的行，也就是说它们的 writeset 没有交集，就可以并行。</li>
+
+</ul>
+</li>
+<li><p>writeset_session</p>
+<ul>
+<li>是在 WRITESET 的基础上多了一个约束，即在主库上同一个线程先后执行的两个事务，在备库执行的时候，要保证相同的先后顺序。</li>
+
+</ul>
+</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.19.4 思考题</h4>
+<ul>
+<li><p>主库单线程插入很多数据，过了3小时候，我们要搭建主库，为了尽快追上主库，要开并行复制，你如何选择策略</p>
+<ul>
+<li><p>查看策略</p>
+<ul>
+<li><code>show variables like &#39;%binlog-transaction-dependency-tracking&#39;;</code>的策略 commit_order, writeset, writeset_session</li>
+
+</ul>
+</li>
+<li><p>分析</p>
+<ul>
+<li>单线程不存在组提交，commit_order pass</li>
+<li>要保证单线程的执行顺序，writeset_session也pass</li>
+<li>writeset 这种基于行的并行复制能力</li>
+
+</ul>
+</li>
+
+</ul>
+</li>
+
+</ul>
+<h3>2.20 主库出问题了，从库怎么办？</h3>
+<h4>2.20.1 一主多从技术架构</h4>
+<p><img src="./images/主从/7.png" referrerpolicy="no-referrer"></p>
+<ul>
+<li><p>分析</p>
+<ul>
+<li>主备切换，也就是A点故障，主库切换成A&#39;</li>
+<li>从库转移，执行 <code>change master命令</code></li>
+<li><code>CHANGE MASTER TO MASTER_HOST=$host_name
+MASTER_PORT=$port
+MASTER_USER=$user_name
+MASTER_PASSWORD=$password
+MASTER_LOG_FILE=$master_log_name
+MASTER_LOG_POS=$master_log_pos</code></li>
+
+</ul>
+</li>
+<li><p>由于B是A的从库，本地记录的是A的位置，但相同的日志，A的位点和A&#39;的位点不同，切换时，如果找到同步位点</p>
+<ul>
+<li>等待新主库A&#39;把中转日志(relay log)全部同步完成</li>
+<li>在A&#39;上执行<code>show master status</code>命令，得到当前A&#39;最新的file和position</li>
+<li>取原主库A故障的时刻T</li>
+<li>用mysqlbinlog工具解析A&#39;的file,得到T时刻的位点</li>
+
+</ul>
+</li>
+<li><p>主从切换时，遇到错误如何处理</p>
+<ul>
+<li><p>主动跳过一个事务</p>
+<ul>
+<li><code>set global sql_slave_skip_counter=1;</code></li>
+<li><code>statrt slave;</code> </li>
+
+</ul>
+</li>
+<li><p>跳过制定的错误</p>
+<ul>
+<li><p><code>set slave_skip_errors=1032,1062</code></p>
+</li>
+<li><p>常见的两种错误</p>
+<ul>
+<li>1062 错误是插入数据时唯一键冲突；</li>
+<li>1032 错误是删除数据时找不到行。</li>
+
+</ul>
+</li>
+
+</ul>
+</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.20.2 GTID</h4>
+<ul>
+<li><p>解析</p>
+<ul>
+<li>解决跳过事务和忽略错误达到最终一致性的复杂性</li>
+
+</ul>
+</li>
+<li><p>如果解决找到同步位点的问题</p>
+<ul>
+<li><p>设置全局事务ID(global transaction identifier), 在一个事务提交的时候生成，是这个事务的唯一标识</p>
+</li>
+<li><p>格式</p>
+<ul>
+<li>GTID=server_uuid:gno</li>
+<li>server_uuid 是一个实例第一个启动时自动生成的，是一个全局唯一的值</li>
+<li>gno是一个整数，初始值为1，每次提交事务时，加1</li>
+
+</ul>
+</li>
+
+</ul>
+</li>
+<li><p>gtid模式启动</p>
+<ul>
+<li>加上参数 gtid_mode=on 和 enforce_gtid_consistency=on</li>
+
+</ul>
+</li>
+<li><p>gtid的两种生成方式</p>
+<ul>
+<li><p>gtid_next=automatic 代表使用默认值</p>
+<ul>
+<li>记录binlog 先设置一行 set @@session.gtid_next=&#39;server_uuid:gno&#39;</li>
+<li>把这个gtid加入本实例的gtid集合中</li>
+
+</ul>
+</li>
+<li><p>gtid_next=&#39;current_gtid&#39;</p>
+<ul>
+<li>当current_gtid存在实例的集合中，接下来这个事务就会被系统忽略</li>
+<li>当current_gtid不存在实例集合中，就把这个gtid分配给当前的事务，不需要系统产生新的gtid, 因此gno也+1</li>
+
+</ul>
+</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.20.3 基于GTID的主备切换</h4>
+<ul>
+<li><p>执行命令</p>
+<ul>
+<li><code>CHANGE MASTER TO
+MASTER_HOST=$host_name
+MASTER_PORT=$port
+MASTER_USER=$user_name
+MASTER_PASSWORD=$password
+master_auto_position=1</code></li>
+<li>其中master_auto_position=1表示这个主备关系使用GTID协议</li>
+
+</ul>
+</li>
+<li><p>主从同步的逻辑 (set_a表示实例A&#39;的GTID集合，set_b表示实例B的GTID集合)</p>
+<ul>
+<li><p>实例 B 指定主库 A’，基于主备协议建立连接。</p>
+</li>
+<li><p>实例B把set_b发送给A&#39;</p>
+</li>
+<li><p>实例A&#39;算出的set_a与set_b的差集，判断A&#39;本地是否包含了这个差集需要的所有binlog事务</p>
+<ul>
+<li>如果不包含，表示A&#39;已经把实例B需要的binlog给删掉，直接返回错误</li>
+<li>如果确认全部包含，A&#39;从自己的binlog文件里面，找出第一个不在set_b的事务，发送给B</li>
+
+</ul>
+</li>
+<li><p>之后就从这个事务开始，往后读文件，按顺序取binlog发送给B去执行</p>
+</li>
+
+</ul>
+</li>
+<li><p>设计思想</p>
+<ul>
+<li>在基于GTID的主备关系，系统认为只要建立主备关系，就必须保证主库发给备库的日志是完整的</li>
+<li>也就是找位点的逻辑，在实例A&#39;内部就已经自动完成，对HA系统开发人员说，非常友好</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.20.4 思考题</h4>
+<ul>
+<li><p>在GTID模式下，从库执行<code>start slave</code>, 发现主库需要的binlog被删掉，导致主备创建不成功，应如果处理？</p>
+<ul>
+<li>如果业务允许主从不一致的情况，那么可以在主库上先执行 show global variables like ‘gtid_purged’，得到主库已经删除的 GTID 集合，假设是 gtid_purged1；然后先在从库上执行 reset master，再执行 set global gtid_purged =‘gtid_purged1’；最后执行 start slave，就会从主库现存的 binlog 开始同步。binlog 缺失的那一部分，数据在从库上就可能会有丢失，造成主从不一致。</li>
+<li>如果需要主从数据一致的话，最好还是通过重新搭建从库来做。</li>
+<li>如果有其他的从库保留有全量的 binlog 的话，可以把新的从库先接到这个保留了全量 binlog 的从库，追上日志以后，如果有需要，再接回主库。</li>
+<li>如果 binlog 有备份的情况，可以先在从库上应用缺失的 binlog，然后再执行 start slave。</li>
+
+</ul>
+</li>
+
+</ul>
+<h3>2.21 读写分离有哪些坑？</h3>
+<h4>2.21.1 读写分离的架构特点</h4>
+<p><strong>客户端直连</strong>
+<img src="./images/主从/8.png" referrerpolicy="no-referrer"></p>
+<ul>
+<li>架构简单，排查问题方便</li>
+<li>可以使用zookeeper组件来控制mysql链接问题，让后端专注业务</li>
+
+</ul>
+<p><strong>proxy架构</strong>
+<img src="./images/主从/9.png" referrerpolicy="no-referrer"></p>
+<ul>
+<li>对客户端比较友好，不需要关注后端细节，连接卫华，后端信息维护，都由proxy完成</li>
+<li>proxy架构也需要高可用，带proxy架构比较复杂</li>
+
+</ul>
+<h4>2.21.2 过期读(从库上读到过期状态)</h4>
+<ul>
+<li><p>主从延迟的解决方案</p>
+<ul>
+<li>强制走主库方案</li>
+<li>sleep方案</li>
+<li>判断主备无延迟方案</li>
+<li>配合semi-sync方案</li>
+<li>等主库位点方案</li>
+<li>等GTID方案</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.21.3 强制走主库方案</h4>
+<ul>
+<li><p>问题</p>
+<ul>
+<li>不好判断业务走主库还是从库，</li>
+<li>如果业务都不能是过期读，这样压力都会落到主库上</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.21.4 sleep方案</h4>
+<ul>
+<li><p>问题</p>
+<ul>
+<li>用户体验不优化</li>
+<li>如果本来只需要0.5s就可以查到从库的正确数据，也要等1s</li>
+<li>超过1s的延迟，出出现过期读</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.21.5 判断主备无延迟方案</h4>
+<p><img src="images/主从/10.png" referrerpolicy="no-referrer"></p>
+<ul>
+<li><p>第一种，先判断 <code>show slave status</code> 中 seconds_behind_master 是否已经等于0</p>
+<ul>
+<li>精度不够，单位秒</li>
+
+</ul>
+</li>
+<li><p>第二种，对比位点确保主备无延迟</p>
+<ul>
+<li>master_log_file和read_master_log_pos 表示读到主库的最新位点</li>
+<li>relay_master_log_file和exec_master_log_pos 表示备库执行的最新位点</li>
+
+</ul>
+</li>
+<li><p>第三种，对比GTID集合确保主备无延迟</p>
+<ul>
+<li>auto_position=1, 表示主备关系使用GTID协议</li>
+<li>Retrieved_Gtid_Set，从库收到的所有日志GTID集合</li>
+<li>Executed_Gtid_Set, 备库所有已执行完成的GTID集合</li>
+<li>如果两个值相同，表示从库接收到日志都已完成同步</li>
+
+</ul>
+</li>
+<li><p>思考
+<img src="images/主从/11.png" referrerpolicy="no-referrer" alt="img.png"></p>
+<ul>
+<li><p>备库还没有收到日志的状态，出现过期读</p>
+<ul>
+<li>trx1 和 trx2 已经传到从库，并且已经执行完成了；</li>
+<li>trx3 在主库执行完成，并且已经回复给客户端，但是还没有传到从库中。</li>
+
+</ul>
+</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.21.6 配合semi-sync (半同步复制)</h4>
+<ul>
+<li><p>主要解决binlog发送同步的问题</p>
+</li>
+<li><p>设计思路</p>
+<ul>
+<li>事务提交的时候，主库把binlog发个从库</li>
+<li>从库收到binlog以后，发回给主库一个ack，表示收到了</li>
+<li>主库收到这个ack以后，才能给客户端返回&quot;事务完成&quot;的确认</li>
+
+</ul>
+</li>
+<li><p>一主多从同步的问题</p>
+<ul>
+<li><p>一主多从，只要等到一个从库的ack，就开始给客户端返回确认</p>
+<ul>
+<li>如果查询是落在这个响应ack的从库上，是能够确保读到最新数据</li>
+<li>但如果查询落到其他从库上，它们可能还没收到最新日志，就会产生过期读的问题</li>
+
+</ul>
+</li>
+<li><p>业务高峰期，主库的位点或GTID集合更新很快，两个位点等值判断就会一直不成立，很有可能从库上迟迟无法响应查询请求的情况
+<img src="images/主从/12.png" referrerpolicy="no-referrer"></p>
+</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.21.7 等主库位点方案</h4>
+<p><img src="images/主从/13.png" referrerpolicy="no-referrer"></p>
+<ul>
+<li><p>命令介绍</p>
+<ul>
+<li><p>从库执行 <code>select master_pos_wait(file, pos[, timeout]);</code></p>
+</li>
+<li><p>参数file 和pos指的是主库上文件名和位置</p>
+</li>
+<li><p>timeout可选，设为正整数N，表示函数最多等待N秒</p>
+<ul>
+<li>执行期间，备库同步线程发生异常，则返回null</li>
+<li>如果等待超过N秒，就返回-1</li>
+<li>如果刚开始执行的时候，发现已经执行过这个位置则返回0</li>
+
+</ul>
+</li>
+
+</ul>
+</li>
+<li><p>具体执行流程</p>
+<ul>
+<li>trx1 事务更新完成后，马上执行 <code>show master status</code> 得到当前主库执行到的 File 和 Position；</li>
+<li>选定一个从库执行查询语句；</li>
+<li>在从库上执行 <code>select master_pos_wait(File, Position, 1);</code></li>
+<li>如果返回值是 &gt;=0 的正整数，则在这个从库执行查询语句；</li>
+<li>否则，到主库执行查询语句。</li>
+
+</ul>
+</li>
+<li><p>不允许过期读的要求，需做好限流策略</p>
+<ul>
+<li>超时放弃</li>
+<li>转主库查询</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.21.8 GTID等待方案</h4>
+<p><img src="images/主从/14.png" referrerpolicy="no-referrer" alt="img.png"></p>
+<ul>
+<li><p>命令介绍</p>
+<ul>
+<li><code>select wait_for_executed_gtid_set(gtid_set, 1);</code></li>
+<li>等待，知道这个库执行的事务中包含传入的gtid_set, 返回0</li>
+<li>超时返回1</li>
+
+</ul>
+</li>
+<li><p>执行流程</p>
+<ul>
+<li><p>trx1 事务更新完成后，从返回包直接获取这个事务的 GTID，记为 gtid1；</p>
+<ul>
+<li>可以直接在事务完成后获得GTID, 在5.7.6之后的版本可以用这种方案</li>
+<li>可以通过 <code>show master status</code> </li>
+
+</ul>
+</li>
+<li><p>选定一个从库执行查询语句；</p>
+</li>
+<li><p>在从库上执行 select wait_for_executed_gtid_set(gtid1, 1)；</p>
+</li>
+<li><p>如果返回值是 0，则在这个从库执行查询语句；</p>
+</li>
+<li><p>否则，到主库执行查询语句。</p>
+</li>
+
+</ul>
+</li>
+<li><p>如果在更新完事务之后，让返回的包能取到这个事务的GTID?</p>
+<ul>
+<li><code>set session_track_gtids=OWN_GTID</code></li>
+<li>通过Api接口 mysql_session_track_get_first从返回包解析出GTID的值</li>
+
+</ul>
+</li>
+
+</ul>
+<h4>2.21.9 思考题？</h4>
+<ul>
+<li><p>使用GTID等位点方案做读写分离，在对大表做DDL的时候会怎样？</p>
+<ul>
+<li>假设，这条语句在主库上要执行 10 分钟，提交后传到备库就要 10 分钟（典型的大事务）。那么，在主库 DDL 之后再提交的事务的 GTID，去备库查的时候，就会等 10 分钟才出现。</li>
+<li>这个读写分离机制在这 10 分钟之内都会超时，然后走主库。</li>
+<li>这种预期内的操作，应该在业务低峰期的时候，确保主库能够支持所有业务查询，然后把读请求都切到主库，再在主库上做 DDL。等备库延迟追上以后，再把读请求切回备库。</li>
+
+</ul>
+</li>
+
+</ul>
+<h3>2.22 如果判断一个数据库是不是处问题了？</h3>
