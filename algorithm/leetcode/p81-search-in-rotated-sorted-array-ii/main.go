@@ -84,3 +84,36 @@ func searchI(nums []int, target int) int {
 	}
 	return -1
 }
+
+
+func search(nums []int, target int) bool {
+	if len(nums) == 0 {
+		return false
+	}
+
+	left, right := 0, len(nums)-1
+	for left <= right {
+		mid := int(uint(left+right)>>1)
+		if target == nums[mid] {
+			return true
+		}
+
+		if nums[left] == nums[mid] && nums[mid] == nums[right] {	// 左右元素都相等没法判断
+			left++
+			right--
+		} else if nums[left] <= nums[mid] {	// 左边有序
+			if nums[left] <= target && target < nums[mid] {	// 判断左边的元素
+				right = mid-1
+			}else {
+				left = mid+1
+			}
+		} else {	// 右边有序
+			if nums[mid] < target && nums[right] >= target {	// 判断右边的元素
+				left = mid+1
+			}else {
+				right = mid-1
+			}
+		}
+	}
+	return false
+}
