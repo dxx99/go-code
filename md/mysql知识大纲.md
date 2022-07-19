@@ -5,8 +5,7 @@
 ## 基础篇
 
 ### 1.1 一条sql查询如何执行
-[链接](https://excalidraw.com/#json=YAoxWVyLifjAHstRdNLLI,3shnK3oLNTjFO0r8oPaiGA)
-![](./images/mysql/mysql架构图.jpg)
+![img.png](images/架构/1.png)
 
 #### 1.1.1 连接器
 - tcp连接之后，在进行用户账号密码权限认证，通过之后在权限表中查出所有权限
@@ -52,7 +51,7 @@
 #### 1.2.2 重要的日志模块：binlog
 - 为归档日志，在server层做记录，没有crash-safe能力
 - 数据更新执行器流程  
-![](./images/mysql/数据更新执行器流程.png)
+- ![img.png](images/架构/2.png)
 
 **思考？**
 - 为什么有了redo log还需要binlog, 谈一下你对这两种日志的理解，以及它们的区别？
@@ -1460,3 +1459,305 @@
 
 
 ### 2.25 到底可不可以使用join
+#### 2.25.1 Index Nested-Loop Join(NLJ) `可以使用被驱动表的索引`
+![img.png](images/join/1.png)
+- 执行流程
+  - 对驱动表t1做全表扫描
+  - 对每一行R, 根据a字段去表t2查找，走索引树搜索
+  - 对t1表的结果在t2表中一一搜索，然后合并结果返回
+- 怎么选择驱动表
+  - 驱动表走全表扫描，而被驱动的表走树索引
+  - 因此需要选择较小的表为驱动表
+- 总结
+  - 使用join语句，性能比单表执行sql语句性能好
+  - 使用join语句，需要让小表做驱动表
+
+#### 2.25.2 Block Nested-Loop Join(BNL) `被驱动的表上没有可用的索引`
+![img.png](images/join/2.png)
+- 执行流程
+  - 把t1表的数据读入线程内存join_buffer中
+  - 扫描t2,把表t2中的每一行取出来，跟join_buffer中的数据对比，满足join条件的，作为结果集返回
+- 性能提升点
+  - 由于数据加入到内存中，判断的速度更快
+- 怎么选择驱动表
+  - 两个表都会进行一次全表扫描M+N
+  - 内存中的判断次数M*N
+  - 因此大表还是小表做驱动表，执行耗时一样
+- join_buffer内存大小如何控制
+  - `join_buffer_size` 默认256k
+  - 如果表中的数据放不下，就会使用分段放
+- 优化
+  - 调节`join_buffer_size`大小，可以改善语句响应速度
+
+#### 2.25.3 总结
+- 能不能使用join语句
+  - 如果使用index Nested-Loop Join算法，可以使用
+  - 如果使用Block Nested-Loop Join算法，尽量不要使用
+  - 通过explain分析，Extra字段是否出现 `Block Nested Loop`
+- 如果使用join,选择大表还是小表做驱动表？
+  - Index Nested-Loop 应该使用小表
+  - Block Nested-Loop
+    - 如果join_buffer_size足够大，是一样的
+    - 如果join_buffer_size不够，应选择小表
+- 小表的定义？
+  - 表按照各自的条件过滤，过滤完之后，计算参与join的各个字段的总数据量，数量小的那个表，就是"小表"，应该作为驱动表
+
+#### 2.25.4 思考题？
+- Block Nested-Loop算法，被驱动表示大表，并且是冷数据，除了IO压力之外，还有什么影响？
+  - Buffer Pool命中率降低
+  - M*N的判断，会占用CPU资源
+  - 多次扫描被驱动表，占用磁盘IO
+
+### 2.26 join语句怎么优化？
+#### 2.26.1 Multi-Range Read优化
+- 目的
+  - 尽量使用顺序读盘
+- 设计思路
+  - 大多数数据都是按主键递增顺序插入得到的
+  - 按照主键递增顺序查询的话，对磁盘的读比较接近顺序读，能够提升读性能
+- 执行流程
+  - 索引a，定位到满足条件的记录，将Id值放入read_rnd_buffer中
+  - 将read_rnd_buffer中的id进行递增排序
+  - 排序的id数组，依次到主键id索引记录中查记录，并作为结果返回
+
+#### 2.26.2 Batched Key Access(BKA) `主要是对NLJ算法的优化`
+- 操作
+  - 被驱动表上建索引，将BNL转换成BKA
+  - 可以考虑使用临时表，然后给临时表加索引，再join操作
+
+#### 2.26.3 hash join
+- mysql官方不支持
+- 用来解决mysql这种M*N的判断操作
+- 整个过程要比临时表方案执行效率高
+
+
+### 2.27 为什么临时表可以重名？
+#### 2.27.1 临时表的特性
+- 主要特点
+  - `create temporary table...` 可以选择多种存储引擎
+  - 只能被自己创建的线程可见
+  - 临时表与普通表可以重名，访问优先级是临时表>普通表
+  - show tables命令不显示临时表
+  - session结束之后，临时表会自动删除
+- 临时表适合join优化的场景
+  - 不同的session可以重名，不用担心表名重复导致建表失败的问题
+  - 不用担心数据删除问题
+
+#### 2.27.2 临时表的应用
+- 优化复杂查询
+- 分库分表系统跨库查询
+![img.png](images/临时表/1.png)
+  - 在proxy层进程代码实现排序
+    - 需要开发工作量比较大
+    - 对proxy端压力比较大
+  - 把各个分库拿到的数据，汇总到一个mysql实例
+    - 建立临时表
+    - 各个分库上执行，将分库的结果插入到临时表
+    - 执行
+
+#### 2.27.3 为啥临时表可以重名？
+- 存放位置
+  - `select @@tmpdir` 或 `show variables like '%tmpdir%';`
+  - 普通表名 table_def_key 由 "库名+表名" 得到
+  - 临时表 table_def_key 由 "库名+表名+server_id+thread_id"
+  - 每个线程都维护了自己的临时表链表，每次操作先遍历临时表，再操作普通表
+
+
+### 2.28 什么时候使用内部临时表？
+#### 2.28.1 union执行流程
+`select id%10 as m, count(*) as c from t1 group by m;`
+
+![img.png](images/临时表/2.png)
+- 执行流程
+  - 创建内存临时表，表里有两个字段 m 和 c，主键是 m；
+  - 扫描表 t1 的索引 a，依次取出叶子节点上的 id 值，计算 id%10 的结果，记为 x；
+    - 如果临时表中没有主键为 x 的行，就插入一个记录 (x,1);
+    - 如果表中有主键为 x 的行，就将 x 这一行的 c 值加 1；
+  - 遍历完成后，再根据字段 m 做排序，得到结果集返回给客户端。
+  
+#### 2.28.2 group by 执行流程
+- 几种算法
+  - 如果对 group by 语句的结果没有排序要求，要在语句后面加 order by null；
+  - 尽量让 group by 过程用上表的索引，确认方法是 explain 结果里没有 Using temporary 和 Using filesort；
+  - 如果 group by 需要统计的数据量不大，尽量只使用内存临时表；也可以通过适当调大 tmp_table_size 参数，来避免用到磁盘临时表；
+  - 如果数据量实在太大，使用 SQL_BIG_RESULT 这个提示，来告诉优化器直接使用排序算法得到 group by 的结果。
+  
+#### 2.28.3 group by优化方案
+- 索引
+- 直接排序
+
+#### 2.28.4 总结
+- 如果语句执行过程可以一边读数据，一边直接得到结果，是不需要额外内存的，否则就需要额外的内存，来保存中间结果；
+- join_buffer 是无序数组，sort_buffer 是有序数组，临时表是二维表结构；
+- 如果执行逻辑需要用到二维表特性，就会优先考虑使用临时表。比如我们的例子中，union 需要用到唯一索引约束， group by 还需要用到另外一个字段来存累积计数。
+
+### 2.29 都说Innodb好，那还要不要使用memory引擎？
+#### 2.29.1 Innodb与memory数组的组织方式
+- Innodb
+  - 把数据放在主键索引上，其他索引上保存的是主键Id
+  - 索引组织表(index organized table)
+- Memory
+  - 采用的是把数据单独存放，索引上存储的是数据位置的组织形式
+  - 堆组织表(heap Organized table)
+- 特点
+  - innodb数据总是有序存放，而内存表的数据是按写入顺序存放的
+  - 数据空洞，innodb为了保证数据的有序性，只能在固定的位置写入新值，而内存表找到空位就可以插入
+  - 数据发生变化，innodb只需要修改主键索引，memory需要修改所以的索引位置
+  - innodb主键查询只走一次索引，普通索引查询需要走两次索引查找，而内存表所有的索引地位相等
+  - Innodb支持变长数据类型，不同记录长度可能不同，内存表不存在blob,text字段，因此内存表的每行数据长度相等
+
+#### 2.29.2 hash索引与B+树索引
+- 生产环境不建议使用内存表的原因
+  - 锁粒度问题
+  - 数据持久性问题
+- 注意
+  - 内存表也支持B+树索引
+
+#### 2.29.3 内存表的锁
+- 内存表不支持行锁，只支持表锁
+  - 一张表只有有更新就会堵住其他在这张表的所有读写操作
+  - 与MDL锁不同，但都是表锁级别
+
+#### 2.29.4 数据持久性问题
+- m-s架构问题
+  - 备库重启，内存表数据被清空，这样主库的binlog同步就会报错
+- 建议把内存表换成InnoDB表来代替
+
+### 2.30 主键自增不连续的三种原因？
+#### 2.30.1 唯一键冲突导致自增主键id不连续
+- 主键自增值保存在哪里
+  - Myisam引擎，保存在数据文件中
+  - Innodb引擎保存在内存中
+    - 8.0版本之后，才有了持久化能力，发生重启，可以恢复到重启前的值
+    - 以前的版本，每次重启之后，就需要重新查询max(id)再进行恢复
+    
+#### 2.30.2 事务回滚导致自增主键不连续
+- 事务回滚，自增值为什么不回退
+  - 目的为了提升性能
+  - 解决主键冲突
+- 自增锁的优化
+  - 自增Id锁并不是一个事务锁，而是每次申请完就马上释放，以便允许别的事务再申请
+  - `show variables like '%innodb_autoinc_lock_mode%'` 控制自增id锁，默认为1
+    - 0表示语句执行结束后才释放锁
+    - 1时对于普通的insert,自增锁申请完之后马上释放，对应`insert...select`批量插入数据要等结束后才被释放
+    - 2表示申请自增主键的动作都是申请后就释放
+    
+#### 2.30.3 自增主键的批量申请
+- 批量申请策略
+  - 第一次申请，分配1个
+  - 第一个用完，第二次申请，会分配2个
+  - 第二个用完，第三次申请，会分配4个
+  - 依次类推，每次申请都是上一次的两倍
+- 目的
+  - `select...insert`的批量申请性能问题
+  
+### 2.31 怎么最快地复制一张表
+#### 2.31.1 物理拷贝
+- 直接进行库文件拷贝
+  - 必须全表拷贝，不能只拷贝部分数据
+  - 需要到服务器上拷贝数据
+  - 原表和目标表都是使用innodb引擎才能使用
+
+#### 2.31.2 mysqldump生产insert语句文件
+- 特点
+  - 可以使用where参数过滤条件，来实现只导出部分数据
+  - 不能使用join复杂的where条件写法
+  - 可以跨引擎使用
+
+#### 2.31.3 select...into outfile方法
+- 特点
+  - 最灵活，支持所有sql写法
+  - 缺点，每次只能导出一张表的数据，而且表结构也需要另外的语句单独备份
+  - 可以跨引擎使用
+  
+### 2.32 grant之后要跟着flush privileges吗？
+#### 2.32.1 全局权限
+- 分析 `grant all privileges on *.* to 'ua'@'%' with grant option;`
+  - grant命令对于全局权限，会同时更新磁盘和内存，命令完成后会即时生效，新创建的链接会使用新的权限
+  - 已存在的链接，不受grant命令影响
+  - `revoke all privileges on *.* from 'ua'@'%';`
+    - 磁盘上修改用户的权限
+    - 内存中，在数组acl_users中找到对象，将access的值修改为0
+
+#### 2.32.2 db权限
+- 分析 `grant all privileges on db1.* to 'ua'@'%' with grant option;`
+  - 每次用户要判断对数据的读写权限，都需要遍历一次acl_users数组，找到对应的用户对象，根据对象位进行判断
+  - grant修改db权限时，会同时对磁盘和内存生效
+  - acl_dbs是一个全局数组对所有线程可见，acl_user缓存在线程中
+
+#### 2.32.3 表权限和列权限
+- 存放地方
+  - `mysql.tables_priv` 和 `mysql.columns_priv`
+  - 这两类权限，组合起来存放在内存的hash结构column_priv_hash中
+- 如果操作
+  - `GRANT SELECT(id), INSERT (id,a) ON mydb.mytbl TO 'ua'@'%' with grant option;`
+  - grant语句都是立即生效
+- `flush privileges` 操作做了什么
+  - 清空 acl_users数组，后面从mysql.user重新加载数据到内存中
+
+#### 2.32.4 flush privileges的场景
+- 目的
+  - 重建内存数据，达到一致状态
+- 错误的操作导致内存数据不一致
+- acl_users数据的清空
+
+
+### 2.33 要不要使用分区表
+#### 2.33.1 分区表操作
+- 如何创建
+  - `CREATE TABLE `t` (
+    `ftime` datetime NOT NULL,
+    `c` int(11) DEFAULT NULL,
+    KEY (`ftime`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+    PARTITION BY RANGE (YEAR(ftime))
+    (PARTITION p_2017 VALUES LESS THAN (2017) ENGINE = InnoDB,
+    PARTITION p_2018 VALUES LESS THAN (2018) ENGINE = InnoDB,
+    PARTITION p_2019 VALUES LESS THAN (2019) ENGINE = InnoDB,
+    PARTITION p_others VALUES LESS THAN MAXVALUE ENGINE = InnoDB);
+    insert into t values('2017-4-1',1),('2018-4-1',1);`
+- 特点
+  - 对引擎层来说是4个表
+  - 对server层来说，就是一个表
+  - 解决了手工分表的难点 
+- 分区策略
+  - myisam 通用分区策略，每次都由server层控制，存在性能问题
+  - innodb 本地分区测录，innodb内部自己管理打开分区行为
+- 需要思考的问题
+  - 第一次访问的时候需要访问所有分区
+  - 共用MDL锁 
+
+
+### 2.34 自增id用完怎么办？
+#### 2.34.1 表定义的自增ID
+- 用完怎么办
+  - 4个字节的无符号，42亿多，理论上很难用完
+  - 修改为8个字节的 bigint unsigned
+
+#### 2.34.2 Innodb系统自增row_id
+- 没有定义主键id,系统会默认生成不可见的6个字节的row_id
+  - row_id 写入表中的值范围，是从 0 到 2的48-1；
+  - 当 dict_sys.row_id=248时，如果再有插入数据的行为要来申请 row_id，拿到以后再取最后 6 个字节的话就是 0。
+- 如果达到上线
+  - row_id会变成零，不会报错，会走覆盖逻辑
+  - 建议换成自定义主键，8字节的
+
+#### 2.34.3 xid
+- 介绍
+  - redo log 和binlog相互配合时，有一个共同的字段叫xid, 用来对应事物
+- 特点
+  - 同一个binlog文件里，xid一定是唯一的
+  - 8个字节，理论上不可能重复
+
+#### 2.34.4 trx_id
+- 介绍
+  - xid是由server维护的，为了在innodb事务和server之间做关联
+  - innodb的trx_id是另外维护的，内部维护一个全局变量，每次申请一个新的trx_id,就加1
+- innodb可见性的核心思想
+  - 每一行数据都记录了更新它的trx_id
+  - 当事务读到一行数据的时候，判断这个数据的可见性的方法，就是通过事物的一致性视图与这行数据的trx_id对比
+  - `通过 select trx_id, trx_mysql_thread_id from information_schema.innodb_trx;`
+  - 6个字节，达到上限之后，会从0开始，这个时候就有脏读的可能
+#### 2.34.5 thread_id
+- 特点
+  - 4字节存储，达到上线之后，重置为0，重新开始
