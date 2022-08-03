@@ -5,7 +5,7 @@
 ## 基础篇
 
 ### 1.1 一条sql查询如何执行
-![img.png](images/架构/1.png)
+![img.png](images/mysql/架构/1.png)
 
 #### 1.1.1 连接器
 - tcp连接之后，在进行用户账号密码权限认证，通过之后在权限表中查出所有权限
@@ -51,7 +51,7 @@
 #### 1.2.2 重要的日志模块：binlog
 - 为归档日志，在server层做记录，没有crash-safe能力
 - 数据更新执行器流程  
-- ![img.png](images/架构/2.png)
+- ![img.png](images/mysql/架构/2.png)
 
 **思考？**
 - 为什么有了redo log还需要binlog, 谈一下你对这两种日志的理解，以及它们的区别？
@@ -785,28 +785,28 @@
 
 #### 2.14.2 各种案例分析
 - 等值查询间隙锁
-![](images/幻读/1.png)
+![](images/mysql/幻读/1.png)
 
 - 非唯一索引等值锁
-![](images/幻读/2.png)
+![](images/mysql/幻读/2.png)
 
 - 主键索引范围锁
-  ![](images/幻读/3.png)
+  ![](images/mysql/幻读/3.png)
 
 - 非唯一索引范围锁
-  ![](images/幻读/4.png)
+  ![](images/mysql/幻读/4.png)
 
 - 唯一索引范围锁bug
-  ![](images/幻读/5.png)
+  ![](images/mysql/幻读/5.png)
 
 - 非唯一索引上存在"等值"的例子
- ![](images/幻读/6.png)
+ ![](images/mysql/幻读/6.png)
 
 - limit语句加锁
-  ![](images/幻读/7.png)
+  ![](images/mysql/幻读/7.png)
 
 - 一个死锁的例子
-  ![](images/幻读/8.png)
+  ![](images/mysql/幻读/8.png)
 
 ### 2.15 mysql有哪些"饮鸩止渴"提高性能的方法？
 #### 2.15.1 短连接风暴
@@ -861,7 +861,7 @@
   - 事务提交将binlog cache写入文件中，会清空binlog cache的缓存
 
 #### 2.16.2 binlog写盘分析
-![](./images/binlog/binlog_write_disk.png)
+![](images/mysql/binlog/binlog_write_disk.png)
 - 分析
   - 图中的 write，指的就是指把日志写入到文件系统的 page cache，并没有把数据持久化到磁盘，所以速度比较快。
   - 图中的 fsync，才是将数据持久化到磁盘的操作。一般情况下，我们认为 fsync 才占磁盘的 IOPS。
@@ -875,7 +875,7 @@
   - 对应的风险：如果主机异常重启，会丢失最近N个事务的binlog日志
 
 #### 2.16.3 redo log的写入机制
-![](./images/redolog/1.png)
+![](images/mysql/redolog/1.png)
 - 三种状态分析
   - 存redo log buffer中，物理上再mysql进程内存中，是红色部分
   - 写到磁盘(write), 但没有持久化(fsync), 物理上是文件系统的page cache里面，是黄色部分
@@ -935,7 +935,7 @@
 
 ### 2.17 mysql怎么保证主备一致性？
 #### 2.17.1 主备的基本原理
-![](./images/主从/1.png)
+![](images/mysql/主从/1.png)
 - 分析流程
   - 主库A内部有一个线程，专门用于服务备库B的这个长连接
   - 从库通过`change master`命令，设置主库IP、端口、账号、密码，以及从那个位置开始请求binlog(文件名，偏移量)
@@ -961,7 +961,7 @@
   - `mysqlbinlog binlog.000001  --start-position=2738 --stop-position=2973 | mysql -h127.0.0.1 -P13000 -u$user -p$pwd;`
 
 #### 2.17.3 循环复制问题
-![](./images/主从/2.png)
+![](images/mysql/主从/2.png)
 - 分析，节点A与节点B互为主从，切换时，binlog是否会被不断循环执行
   - 从节点 A 更新的事务，binlog 里面记的都是 A 的 server id；
   - 传到节点 B 执行一次以后，节点 B 生成的 binlog 的 server id 也是 A 的 server id；
@@ -1005,7 +1005,7 @@
 - 可用性优先策略
 
 #### 2.18.4 可靠性优先策略
-![](./images/主从/3.png)
+![](images/mysql/主从/3.png)
 - 切换流程
   - 判断备库 B 现在的 seconds_behind_master，如果小于某个值（比如 5 秒）继续下一步，否则持续重试这一步；
   - 把主库 A 改成只读状态，即把 readonly 设置为 true；
@@ -1019,13 +1019,13 @@
 #### 2.18.5 可用性优先策略
 - 代价：可能造成数据不一致性
 - binlog_format=mixed的场景
-  ![](./images/主从/4.png)
+  ![](images/mysql/主从/4.png)
   - 步骤 2 中，主库 A 执行完 insert 语句，插入了一行数据（4,4），之后开始进行主备切换。
   - 步骤 3 中，由于主备之间有 5 秒的延迟，所以备库 B 还没来得及应用“插入 c=4”这个中转日志，就开始接收客户端“插入 c=5”的命令。
   - 步骤 4 中，备库 B 插入了一行数据（4,5），并且把这个 binlog 发给主库 A。
   - 步骤 5 中，备库 B 执行“插入 c=4”这个中转日志，插入了一行数据（5,4）。而直接在备库 B 执行的“插入 c=5”这个语句，传到主库 A，就插入了一行新数据（5,5）。
 - binlog_format=row的场景
-![](./images/主从/5.png)
+![](images/mysql/主从/5.png)
 - 因为 row 格式在记录 binlog 的时候，会记录新插入的行的所有字段值，所以最后只会有一行不一致。而且，两边的主备同步的应用线程会报错 duplicate key error 并停止。也就是说，这种情况下，备库 B 的 (5,4) 和主库 A 的 (5,5) 这两行数据，都不会被对方执行。
 - 结论
   - 使用 row 格式的 binlog 时，数据不一致的问题更容易被发现。而使用 mixed 或者 statement 格式的 binlog 时，数据很可能悄悄地就不一致了。如果你过了很久才发现数据不一致的问题，很可能这时的数据不一致已经不可查，或者连带造成了更多的数据逻辑不一致。
@@ -1043,7 +1043,7 @@
   - 对于一个压力比较高的主库来说，备库很有可能永远也追不上主库
 
 #### 2.19.2 并行复制模型
-![](./images/主从/6.png)
+![](images/mysql/主从/6.png)
 - worker数量如何控制
   - `show variables like '%slave_parallel_workers%';` 一般为机器的1/4-1/2核
 - coordinator在分发任务应遵循的原则
@@ -1094,7 +1094,7 @@
 
 ### 2.20 主库出问题了，从库怎么办？
 #### 2.20.1 一主多从技术架构
-![](./images/主从/7.png)
+![](images/mysql/主从/7.png)
 - 分析
   - 主备切换，也就是A点故障，主库切换成A'
   - 从库转移，执行 `change master命令`
@@ -1169,12 +1169,12 @@
 ### 2.21 读写分离有哪些坑？
 #### 2.21.1 读写分离的架构特点
 **客户端直连**
-![](./images/主从/8.png)
+![](images/mysql/主从/8.png)
   - 架构简单，排查问题方便
   - 可以使用zookeeper组件来控制mysql链接问题，让后端专注业务
 
 **proxy架构**
-![](./images/主从/9.png)
+![](images/mysql/主从/9.png)
   - 对客户端比较友好，不需要关注后端细节，连接卫华，后端信息维护，都由proxy完成
   - proxy架构也需要高可用，带proxy架构比较复杂
 
@@ -1199,7 +1199,7 @@
   - 超过1s的延迟，出出现过期读
 
 #### 2.21.5 判断主备无延迟方案
-![](images/主从/10.png)
+![](images/mysql/主从/10.png)
 - 第一种，先判断 `show slave status` 中 seconds_behind_master 是否已经等于0
   - 精度不够，单位秒
 - 第二种，对比位点确保主备无延迟
@@ -1211,7 +1211,7 @@
   - Executed_Gtid_Set, 备库所有已执行完成的GTID集合
   - 如果两个值相同，表示从库接收到日志都已完成同步
 - 思考
-  ![img.png](images/主从/11.png)
+  ![img.png](images/mysql/主从/11.png)
   - 备库还没有收到日志的状态，出现过期读
     - trx1 和 trx2 已经传到从库，并且已经执行完成了；
     - trx3 在主库执行完成，并且已经回复给客户端，但是还没有传到从库中。
@@ -1227,10 +1227,10 @@
     - 如果查询是落在这个响应ack的从库上，是能够确保读到最新数据
     - 但如果查询落到其他从库上，它们可能还没收到最新日志，就会产生过期读的问题
   - 业务高峰期，主库的位点或GTID集合更新很快，两个位点等值判断就会一直不成立，很有可能从库上迟迟无法响应查询请求的情况
-    ![](images/主从/12.png)
+    ![](images/mysql/主从/12.png)
 
 #### 2.21.7 等主库位点方案
-![](images/主从/13.png)
+![](images/mysql/主从/13.png)
 - 命令介绍
   - 从库执行 `select master_pos_wait(file, pos[, timeout]);`
   - 参数file 和pos指的是主库上文件名和位置
@@ -1249,7 +1249,7 @@
   - 转主库查询
 
 #### 2.21.8 GTID等待方案
-![img.png](images/主从/14.png)
+![img.png](images/mysql/主从/14.png)
 - 命令介绍
   - `select wait_for_executed_gtid_set(gtid_set, 1);`
   - 等待，知道这个库执行的事务中包含传入的gtid_set, 返回0
@@ -1309,7 +1309,7 @@
 
 #### 2.22.4 内部统计
 - 针对磁盘问题 `select * from performance_schema.file_summary_by_event_name` 表示每次IO统计的时间
-  ![img.png](images/检测/1.png)
+  ![img.png](images/mysql/检测/1.png)
   - 查看 event_name="wait/io/file/innodb/innodb_log_file" 这行的数据
   - 统计redo log写入时间，event_name表示统计的类型
   - count_star所有io的总次数
@@ -1460,7 +1460,7 @@
 
 ### 2.25 到底可不可以使用join
 #### 2.25.1 Index Nested-Loop Join(NLJ) `可以使用被驱动表的索引`
-![img.png](images/join/1.png)
+![img.png](images/mysql/join/1.png)
 - 执行流程
   - 对驱动表t1做全表扫描
   - 对每一行R, 根据a字段去表t2查找，走索引树搜索
@@ -1473,7 +1473,7 @@
   - 使用join语句，需要让小表做驱动表
 
 #### 2.25.2 Block Nested-Loop Join(BNL) `被驱动的表上没有可用的索引`
-![img.png](images/join/2.png)
+![img.png](images/mysql/join/2.png)
 - 执行流程
   - 把t1表的数据读入线程内存join_buffer中
   - 扫描t2,把表t2中的每一行取出来，跟join_buffer中的数据对比，满足join条件的，作为结果集返回
@@ -1546,7 +1546,7 @@
 #### 2.27.2 临时表的应用
 - 优化复杂查询
 - 分库分表系统跨库查询
-![img.png](images/临时表/1.png)
+![img.png](images/mysql/临时表/1.png)
   - 在proxy层进程代码实现排序
     - 需要开发工作量比较大
     - 对proxy端压力比较大
@@ -1567,7 +1567,7 @@
 #### 2.28.1 union执行流程
 `select id%10 as m, count(*) as c from t1 group by m;`
 
-![img.png](images/临时表/2.png)
+![img.png](images/mysql/临时表/2.png)
 - 执行流程
   - 创建内存临时表，表里有两个字段 m 和 c，主键是 m；
   - 扫描表 t1 的索引 a，依次取出叶子节点上的 id 值，计算 id%10 的结果，记为 x；

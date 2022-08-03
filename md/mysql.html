@@ -1539,21 +1539,21 @@
 <h4>2.14.2 各种案例分析</h4>
 <ul>
 <li>等值查询间隙锁
-<img src="images/幻读/1.png" referrerpolicy="no-referrer"></li>
+<img src="images/mysql/幻读/1.png" referrerpolicy="no-referrer"></li>
 <li>非唯一索引等值锁
-<img src="images/幻读/2.png" referrerpolicy="no-referrer"></li>
+<img src="images/mysql/幻读/2.png" referrerpolicy="no-referrer"></li>
 <li>主键索引范围锁
-<img src="images/幻读/3.png" referrerpolicy="no-referrer"></li>
+<img src="images/mysql/幻读/3.png" referrerpolicy="no-referrer"></li>
 <li>非唯一索引范围锁
-<img src="images/幻读/4.png" referrerpolicy="no-referrer"></li>
+<img src="images/mysql/幻读/4.png" referrerpolicy="no-referrer"></li>
 <li>唯一索引范围锁bug
-<img src="images/幻读/5.png" referrerpolicy="no-referrer"></li>
+<img src="images/mysql/幻读/5.png" referrerpolicy="no-referrer"></li>
 <li>非唯一索引上存在&quot;等值&quot;的例子
-<img src="images/幻读/6.png" referrerpolicy="no-referrer"></li>
+<img src="images/mysql/幻读/6.png" referrerpolicy="no-referrer"></li>
 <li>limit语句加锁
-<img src="images/幻读/7.png" referrerpolicy="no-referrer"></li>
+<img src="images/mysql/幻读/7.png" referrerpolicy="no-referrer"></li>
 <li>一个死锁的例子
-<img src="images/幻读/8.png" referrerpolicy="no-referrer"></li>
+<img src="images/mysql/幻读/8.png" referrerpolicy="no-referrer"></li>
 
 </ul>
 <h3>2.15 mysql有哪些&quot;饮鸩止渴&quot;提高性能的方法？</h3>
@@ -1666,7 +1666,7 @@
 
 </ul>
 <h4>2.16.2 binlog写盘分析</h4>
-<p><img src="./images/binlog/binlog_write_disk.png" referrerpolicy="no-referrer"></p>
+<p><img src="images/mysql/binlog/binlog_write_disk.png" referrerpolicy="no-referrer"></p>
 <ul>
 <li><p>分析</p>
 <ul>
@@ -1694,7 +1694,7 @@
 
 </ul>
 <h4>2.16.3 redo log的写入机制</h4>
-<p><img src="./images/redolog/1.png" referrerpolicy="no-referrer"></p>
+<p><img src="images/mysql/redolog/1.png" referrerpolicy="no-referrer"></p>
 <ul>
 <li><p>三种状态分析</p>
 <ul>
@@ -1814,7 +1814,7 @@
 </ul>
 <h3>2.17 mysql怎么保证主备一致性？</h3>
 <h4>2.17.1 主备的基本原理</h4>
-<p><img src="./images/主从/1.png" referrerpolicy="no-referrer"></p>
+<p><img src="images/mysql/主从/1.png" referrerpolicy="no-referrer"></p>
 <ul>
 <li><p>分析流程</p>
 <ul>
@@ -1869,7 +1869,7 @@
 
 </ul>
 <h4>2.17.3 循环复制问题</h4>
-<p><img src="./images/主从/2.png" referrerpolicy="no-referrer"></p>
+<p><img src="images/mysql/主从/2.png" referrerpolicy="no-referrer"></p>
 <ul>
 <li><p>分析，节点A与节点B互为主从，切换时，binlog是否会被不断循环执行</p>
 <ul>
@@ -1957,7 +1957,7 @@
 
 </ul>
 <h4>2.18.4 可靠性优先策略</h4>
-<p><img src="./images/主从/3.png" referrerpolicy="no-referrer"></p>
+<p><img src="images/mysql/主从/3.png" referrerpolicy="no-referrer"></p>
 <ul>
 <li><p>切换流程</p>
 <ul>
@@ -1983,7 +1983,7 @@
 <li><p>代价：可能造成数据不一致性</p>
 </li>
 <li><p>binlog_format=mixed的场景
-<img src="./images/主从/4.png" referrerpolicy="no-referrer"></p>
+<img src="images/mysql/主从/4.png" referrerpolicy="no-referrer"></p>
 <ul>
 <li>步骤 2 中，主库 A 执行完 insert 语句，插入了一行数据（4,4），之后开始进行主备切换。</li>
 <li>步骤 3 中，由于主备之间有 5 秒的延迟，所以备库 B 还没来得及应用“插入 c=4”这个中转日志，就开始接收客户端“插入 c=5”的命令。</li>
@@ -1993,7 +1993,7 @@
 </ul>
 </li>
 <li><p>binlog_format=row的场景
-<img src="./images/主从/5.png" referrerpolicy="no-referrer"></p>
+<img src="images/mysql/主从/5.png" referrerpolicy="no-referrer"></p>
 </li>
 <li><p>因为 row 格式在记录 binlog 的时候，会记录新插入的行的所有字段值，所以最后只会有一行不一致。而且，两边的主备同步的应用线程会报错 duplicate key error 并停止。也就是说，这种情况下，备库 B 的 (5,4) 和主库 A 的 (5,5) 这两行数据，都不会被对方执行。</p>
 </li>
@@ -2026,7 +2026,7 @@
 
 </ul>
 <h4>2.19.2 并行复制模型</h4>
-<p><img src="./images/主从/6.png" referrerpolicy="no-referrer"></p>
+<p><img src="images/mysql/主从/6.png" referrerpolicy="no-referrer"></p>
 <ul>
 <li><p>worker数量如何控制</p>
 <ul>
@@ -2150,7 +2150,7 @@
 </ul>
 <h3>2.20 主库出问题了，从库怎么办？</h3>
 <h4>2.20.1 一主多从技术架构</h4>
-<p><img src="./images/主从/7.png" referrerpolicy="no-referrer"></p>
+<p><img src="images/mysql/主从/7.png" referrerpolicy="no-referrer"></p>
 <ul>
 <li><p>分析</p>
 <ul>
@@ -2309,14 +2309,14 @@ master_auto_position=1</code></li>
 <h3>2.21 读写分离有哪些坑？</h3>
 <h4>2.21.1 读写分离的架构特点</h4>
 <p><strong>客户端直连</strong>
-<img src="./images/主从/8.png" referrerpolicy="no-referrer"></p>
+<img src="images/mysql/主从/8.png" referrerpolicy="no-referrer"></p>
 <ul>
 <li>架构简单，排查问题方便</li>
 <li>可以使用zookeeper组件来控制mysql链接问题，让后端专注业务</li>
 
 </ul>
 <p><strong>proxy架构</strong>
-<img src="./images/主从/9.png" referrerpolicy="no-referrer"></p>
+<img src="images/mysql/主从/9.png" referrerpolicy="no-referrer"></p>
 <ul>
 <li>对客户端比较友好，不需要关注后端细节，连接卫华，后端信息维护，都由proxy完成</li>
 <li>proxy架构也需要高可用，带proxy架构比较复杂</li>
@@ -2361,7 +2361,7 @@ master_auto_position=1</code></li>
 
 </ul>
 <h4>2.21.5 判断主备无延迟方案</h4>
-<p><img src="images/主从/10.png" referrerpolicy="no-referrer"></p>
+<p><img src="images/mysql/主从/10.png" referrerpolicy="no-referrer"></p>
 <ul>
 <li><p>第一种，先判断 <code>show slave status</code> 中 seconds_behind_master 是否已经等于0</p>
 <ul>
@@ -2386,7 +2386,7 @@ master_auto_position=1</code></li>
 </ul>
 </li>
 <li><p>思考
-<img src="images/主从/11.png" referrerpolicy="no-referrer" alt="img.png"></p>
+<img src="images/mysql/主从/11.png" referrerpolicy="no-referrer" alt="img.png"></p>
 <ul>
 <li><p>备库还没有收到日志的状态，出现过期读</p>
 <ul>
@@ -2422,7 +2422,7 @@ master_auto_position=1</code></li>
 </ul>
 </li>
 <li><p>业务高峰期，主库的位点或GTID集合更新很快，两个位点等值判断就会一直不成立，很有可能从库上迟迟无法响应查询请求的情况
-<img src="images/主从/12.png" referrerpolicy="no-referrer"></p>
+<img src="images/mysql/主从/12.png" referrerpolicy="no-referrer"></p>
 </li>
 
 </ul>
@@ -2430,7 +2430,7 @@ master_auto_position=1</code></li>
 
 </ul>
 <h4>2.21.7 等主库位点方案</h4>
-<p><img src="images/主从/13.png" referrerpolicy="no-referrer"></p>
+<p><img src="images/mysql/主从/13.png" referrerpolicy="no-referrer"></p>
 <ul>
 <li><p>命令介绍</p>
 <ul>
@@ -2469,7 +2469,7 @@ master_auto_position=1</code></li>
 
 </ul>
 <h4>2.21.8 GTID等待方案</h4>
-<p><img src="images/主从/14.png" referrerpolicy="no-referrer" alt="img.png"></p>
+<p><img src="images/mysql/主从/14.png" referrerpolicy="no-referrer" alt="img.png"></p>
 <ul>
 <li><p>命令介绍</p>
 <ul>
