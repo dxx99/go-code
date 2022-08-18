@@ -1,7 +1,7 @@
 package main
 
 // TODO
-// 并查集
+// andCheck
 //
 func main() {
 

@@ -48,7 +48,7 @@ func maxSubArray(nums []int) int {
 	return ans
 }
 
-// 动态规划
+// dynamicProgramming
 func maxSubArrayV2(nums []int) int {
 	if len(nums) == 0 {
 		return 0

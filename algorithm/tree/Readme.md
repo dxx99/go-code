@@ -12,21 +12,21 @@
 - 每一次递归调用都会把函数的局部变量、参数值和返回值地址等压入调用栈中
 - 返回时，从栈顶弹出上一次递归的各项参数，所以这就是递归可以返回上一层位置的原因
 
-### [遍历](./二叉树遍历/main.go)
+### [遍历](binaryTreeRange/main.go)
 ![](./images/二叉树前中序遍历.png)
 
 #### 递归遍历
-- [前序遍历](./二叉树遍历/main.go#L16)
-- [中序遍历](./二叉树遍历/main.go#L34)
-- [后序遍历](./二叉树遍历/main.go#L53)
+- [前序遍历](binaryTreeRange/main.go#L16)
+- [中序遍历](binaryTreeRange/main.go#L34)
+- [后序遍历](binaryTreeRange/main.go#L53)
 
 #### 迭代遍历
-- [前序遍历](./二叉树遍历/main.go#L74)
-- [中序遍历](./二叉树遍历/main.go#L104)
-- [后序遍历](./二叉树遍历/main.go#L130)
+- [前序遍历](binaryTreeRange/main.go#L74)
+- [中序遍历](binaryTreeRange/main.go#L104)
+- [后序遍历](binaryTreeRange/main.go#L130)
 
 ### 层序遍历
-- [bfs](./二叉树遍历/main.go#L162)
+- [bfs](binaryTreeRange/main.go#L162)
 
 ### 树的递归函数的注意点
 #### 1. 怎么确定树的叶子节点
@@ -81,7 +81,7 @@ if leftHeight == rightHeight {
 ![](./images/二叉树.png)
 
 
-### [LeetCode二叉树层序遍历](./力扣层序遍历/main.go)
+### [LeetCode二叉树层序遍历](levelOrderTraversal/main.go)
 - [102.二叉树的层序遍历](https://leetcode.cn/problems/binary-tree-level-order-traversal/)
 - [107.二叉树的层次遍历II](https://leetcode.cn/problems/binary-tree-level-order-traversal-ii/)
 - [199.二叉树的右视图](https://leetcode.cn/problems/binary-tree-right-side-view/)
@@ -93,7 +93,7 @@ if leftHeight == rightHeight {
 - [104.二叉树的最大深度](https://leetcode.cn/problems/maximum-depth-of-binary-tree/)
 - [111.二叉树的最小深度](https://leetcode.cn/problems/minimum-depth-of-binary-tree/)
 
-### [二叉树的修改与构造](./二叉树的修改与构造/main.go)
+### [二叉树的修改与构造](binaryTreeMake/main.go)
 - [226.反转二叉树](https://leetcode.cn/problems/invert-binary-tree/)
 - [101.对称二叉树](https://leetcode.cn/problems/symmetric-tree/)
 - [222. 完全二叉树的节点个数](https://leetcode.cn/problems/count-complete-tree-nodes/)
@@ -104,13 +104,13 @@ if leftHeight == rightHeight {
 - [112. 路径总和](https://leetcode.cn/problems/path-sum/)
 - [113. 路径总和 II](https://leetcode.cn/problems/path-sum-ii/)
 
-### [二叉树构建](./二叉树构建/main.go)
+### [二叉树构建](binaryTreeModify/main.go)
 - [106. 从中序与后序遍历序列构造二叉树](https://leetcode.cn/problems/construct-binary-tree-from-inorder-and-postorder-traversal/)
 - [105. 从前序与中序遍历序列构造二叉树](https://leetcode.cn/problems/construct-binary-tree-from-preorder-and-inorder-traversal/)
 - [654. 最大二叉树](https://leetcode.cn/problems/maximum-binary-tree/)
 - [617.合并二叉树](https://leetcode.cn/problems/merge-two-binary-trees/)
 
-### [二叉搜索树](./二叉搜索树/main.go)
+### [二叉搜索树](binarySearchTree/main.go)
 - [700. 二叉搜索树中的搜索](https://leetcode.cn/problems/search-in-a-binary-search-tree/)
 - [98. 验证二叉搜索树](https://leetcode.cn/problems/validate-binary-search-tree/)
 - [530. 二叉搜索树的最小绝对差](https://leetcode.cn/problems/minimum-absolute-difference-in-bst/)
@@ -122,6 +122,6 @@ if leftHeight == rightHeight {
 - [538. 把二叉搜索树转换为累加树](https://leetcode.cn/problems/convert-bst-to-greater-tree/)
 
 
-### [二叉树公共祖先问题](./二叉树公共祖先问题/main.go)
+### [二叉树公共祖先问题](commonAncestor/main.go)
 - [236. 二叉树的最近公共祖先](https://leetcode.cn/problems/lowest-common-ancestor-of-a-binary-tree/)
 - [235. 二叉搜索树的最近公共祖先](https://leetcode.cn/problems/lowest-common-ancestor-of-a-binary-search-tree/)

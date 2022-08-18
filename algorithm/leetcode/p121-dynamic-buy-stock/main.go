@@ -108,7 +108,7 @@ func maxProfit(prices []int) int {
 	return profit
 }
 
-// 动态规划
+// dynamicProgramming
 // 类似于前面提到的子数组最大的和
 // 存储： 今天之前买入最小值
 // 比较： 今天卖出的最大收益，也是之前的最小值与今天值的比较，如果之前大于今天值，则替换存储，将今天的收益变为0

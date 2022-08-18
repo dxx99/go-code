@@ -55,7 +55,7 @@ func minSumSquareDiff(nums1 []int, nums2 []int, k1 int, k2 int) int64 {
 	for i := 0; i < len(arr); i++ {
 		arr[i] = abs(nums2[i] - nums1[i])
 	}
-	// 排序
+	// sort
 	sort.Ints(arr)
 	k := k1+k2
 	fmt.Println(arr)

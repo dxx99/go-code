@@ -19,7 +19,7 @@ func maxProfitAssignment(difficulty []int, profit []int, worker []int) int {
 		pd[i] = []int{profit[i], difficulty[i]}
 	}
 
-	// 排序
+	// sort
 	sort.Slice(pd, func(i, j int) bool {
 		return pd[i][0] > pd[j][0]
 	})

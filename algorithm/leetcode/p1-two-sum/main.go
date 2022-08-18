@@ -67,7 +67,7 @@ func twoSum(nums []int, target int) []int {
 
 	}
 
-	// 排序
+	// sort
 	sort.Sort(sort.IntSlice(nums))
 	left, right := 0, len(nums)-1
 

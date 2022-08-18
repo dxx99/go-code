@@ -103,7 +103,7 @@ func climbStairsV4(n int) int {
 	return dp[n]
 }
 
-// 动态规划 + 完全背包求解
+// dynamicProgramming + 完全背包求解
 func climbStairsV5(n int) int {
 	dp := make([]int, n+1)
 	dp[0] = 1

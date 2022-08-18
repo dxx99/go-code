@@ -12,7 +12,7 @@ func main() {
 
 // 1712. 将数组分成三个子数组的方案数
 // https://leetcode.cn/problems/ways-to-split-array-into-three-subarrays/
-// 【前缀和】【二分查找】
+// 【prefixSum】【binarySearch】
 // 记录两个分隔的位置为 left, right
 // 利用前缀和， S[left] <= S[right] - S[left] <= S[n] - S[right]
 // 变形为 2 * S[left] <= S[right]  和  S[left] >= 2*S[right] - S[n]

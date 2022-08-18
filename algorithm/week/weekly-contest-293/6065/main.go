@@ -7,7 +7,7 @@ func main() {
 	fmt.Println(largestCombination([]int{8,8}))
 }
 
-// 动态规划
+// dynamicProgramming
 // TODO:
 func largestCombinationV2(candidates []int) int {
 	max := 0

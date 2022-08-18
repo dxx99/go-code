@@ -12,7 +12,7 @@ func main() {
 	fmt.Println(minArrayV2([]int{2,2,2,0,1}))
 }
 
-// 二分查找
+// binarySearch
 // 最后的结果都是左右索引都会相等
 func minArray(numbers []int) int {
 	left, right := 0, len(numbers)-1

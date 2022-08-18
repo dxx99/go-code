@@ -2,7 +2,7 @@ package main
 
 import "fmt"
 
-// 二分查找
+// binarySearch
 // 左右边界的二分查找常用的左闭右开的方法来查找
 // 二分思维的精髓就是：通过已知信息尽可能多地收缩（折半）搜索空间
 func main() {

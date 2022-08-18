@@ -43,7 +43,7 @@ func main() {
 	fmt.Println(findLengthOfLCISV2([]int{1}))
 }
 
-// 动态规划
+// dynamicProgramming
 func findLengthOfLCIS(nums []int) int {
 	if len(nums) == 0 {return 0}
 	dp := make([]int, len(nums))

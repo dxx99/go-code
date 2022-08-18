@@ -27,7 +27,7 @@ func minEatingSpeed(piles []int, h int) int {
 	}
 	return x
 }
-// 优化，二分查找
+// 优化，binarySearch
 func minEatingSpeedV2(piles []int, h int) int {
 	f := func(k int) int {
 		usedHour := 0

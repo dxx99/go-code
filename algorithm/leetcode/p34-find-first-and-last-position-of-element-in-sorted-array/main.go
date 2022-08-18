@@ -54,7 +54,7 @@ func main() {
 	fmt.Println(searchRange([]int{}, 0))
 	fmt.Println(searchRange([]int{1,1,1,1}, 1))
 }
-// 二分查找。。。。
+// binarySearch。。。。
 func searchRange(nums []int, target int) []int {
 	left, right := 0, len(nums)
 	lIndex, rIndex := -1, -1

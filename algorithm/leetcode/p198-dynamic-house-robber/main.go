@@ -47,7 +47,7 @@ func main() {
 	fmt.Println(robV2([]int{1}))
 }
 
-// 动态规划：推出公式 []int{1,2,3,1}
+// dynamicProgramming：推出公式 []int{1,2,3,1}
 // S表示偷多少间房的最大值，H表示当前房屋的财富
 // 第1间房   S0 = H0 = 1
 // 第2间房   S1 = Max(S0, H1) = 2
@@ -90,7 +90,7 @@ func rob(nums []int) int {
 	return s[l-1]
 }
 
-// 动态规划 + 滚动数组
+// dynamicProgramming + 滚动数组
 func robV2(nums []int) int {
 	// 前后两个值来替代数组
 	first, second := 0, 0

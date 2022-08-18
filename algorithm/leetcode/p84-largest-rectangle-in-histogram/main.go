@@ -40,7 +40,7 @@ func main() {
 	fmt.Println(largestRectangleAreaV2([]int{2,1,5,6,2,3}))
 }
 
-// 动态规划
+// dynamicProgramming
 func largestRectangleAreaV2(heights []int) int {
 	minLeft, minRight := make([]int, len(heights)), make([]int, len(heights))
 

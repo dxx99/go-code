@@ -104,7 +104,7 @@ func maxSubArray(nums []int) int {
 	return max
 }
 
-// 动态规划
+// dynamicProgramming
 // 如果前一个元素大于零，则将其加到当前元素上
 // f(n) = max(f(n-1), 0) + n
 func maxSubArrayV2(nums []int) int {

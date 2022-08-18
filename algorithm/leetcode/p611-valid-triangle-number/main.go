@@ -23,7 +23,7 @@ func main() {
 }
 
 // 611. 有效三角形的个数
-// 二分查找 O((n^2)*log(n))
+// binarySearch O((n^2)*log(n))
 // 链接地址: https://leetcode.cn/problems/valid-triangle-number/solution/
 func triangleNumber(nums []int) int {
 	ans := 0

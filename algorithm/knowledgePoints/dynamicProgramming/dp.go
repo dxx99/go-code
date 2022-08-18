@@ -49,7 +49,7 @@ func lengthOfLIS(nums []int) int {
 	}
 	return ans
 }
-// 优化：二分查找 O(N*Log(N))
+// 优化：binarySearch O(N*Log(N))
 func lengthOfLISV2(nums []int) int {
 	top := make([]int, len(nums))	// 存放堆的位置，只存放一个元素在堆上
 	piles := 0 // 初始化牌堆的数量
