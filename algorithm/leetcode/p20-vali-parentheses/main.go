@@ -77,3 +77,22 @@ func isValid(s string) bool {
 	}
 	return false
 }
+
+func isValidV1(s string) bool {
+	stack := make([]byte, 0)
+
+	m := map[byte]byte{')':'(', ']':'[', '}':'{'}
+	for _, b := range s {
+		x, ok := m[byte(b)]
+		if !ok {
+			stack = append(stack, byte(b))
+		} else {
+			if len(stack) == 0 || stack[len(stack)-1] != x {
+				return false
+			}
+			stack = stack[:len(stack)-1]
+		}
+	}
+
+	return len(stack) == 0
+}

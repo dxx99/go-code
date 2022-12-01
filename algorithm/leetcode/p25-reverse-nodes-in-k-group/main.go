@@ -1,5 +1,7 @@
 package main
 
+import "fmt"
+
 // 给你链表的头节点 head ，每 k 个节点一组进行翻转，请你返回修改后的链表。
 //
 //k 是一个正整数，它的值小于或等于链表的长度。如果节点总数不是 k 的整数倍，那么请将最后剩余的节点保持原有顺序。
@@ -34,6 +36,17 @@ package main
 //著作权归领扣网络所有。商业转载请联系官方授权，非商业转载请注明出处。
 func main() {
 
+	head := &ListNode{1, nil}
+	head.Next = &ListNode{2, nil}
+
+	newHead := reverseKGroup(head, 2)
+
+	for newHead != nil {
+		fmt.Printf("%d\t", newHead.Val)
+		newHead = newHead.Next
+	}
+
+
 }
 
 /**
@@ -49,14 +62,40 @@ type ListNode struct {
 	Next *ListNode
 }
 
-//func reverseKGroup(head *ListNode, k int) *ListNode {
-//	curDeep := 0
-//	var reverse func(*ListNode, *ListNode) (*ListNode, *ListNode)
-//	reverse = func(head *ListNode, tail *ListNode) (*ListNode, *ListNode) {
+// 利用环形数组优化代码
+func reverseKGroup(head *ListNode, k int) *ListNode {
+	stack := make([]*ListNode, 0)
+	dummy := &ListNode{0, nil}
+	tmp := dummy
+	c := k
+	for head != nil {
+		stack = append(stack, head)
+		head = head.Next
+		c--
+
+		// 需要反转，出栈
+		if c == 0 {
+			for len(stack) != 0 {
+				node := stack[len(stack)-1]
+				stack = stack[:len(stack)-1]
+				node.Next = nil
+				tmp.Next = node
+				tmp = tmp.Next
+			}
+
+			// 环形指针复原
+			c = k
+		}
+	}
+
+	// 处理栈中剩下的元素
+	for _, node := range stack {
+		node.Next = nil
+		tmp.Next = node
+		tmp = tmp.Next
+	}
+
+	return dummy.Next
+}
+
 //
-//		curDeep++
-//		curDeep--
-//	}
-//
-//	return head
-//}
