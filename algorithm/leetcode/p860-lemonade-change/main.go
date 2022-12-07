@@ -53,31 +53,22 @@ func lemonadeChange(bills []int) bool {
 		if bills[i] == 5 {
 			fiveNum++
 		}else if bills[i] == 10 {
+			if fiveNum == 0 {
+				return false
+			}
+			fiveNum--
 			tenNum++
-			if fiveNum >= 1 {
+		}else if bills[i] == 20 {
+			if fiveNum > 0 && tenNum > 0 {
 				fiveNum--
+				tenNum--
+			} else if fiveNum >= 3 {
+				fiveNum -= 3
 			}else {
 				return false
 			}
-		}else if bills[i] == 20 {
-			if tenNum >= 1 {
-				tenNum--
-				if fiveNum >= 1 {
-					fiveNum--
-				}else {
-					return false
-				}
-			} else {
-				if fiveNum >= 3 {
-					fiveNum -= 3
-				} else {
-					return false
-				}
-			}
-		}else {
-			return false
+
 		}
 	}
-
 	return true
 }

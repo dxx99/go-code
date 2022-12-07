@@ -44,6 +44,54 @@ func main() {
 	fmt.Println(maxSubArrayVtx(nums))
 }
 
+
+// 分治算法
+func maxSubArrayDg(nums []int) int {
+	return get(nums, 0, len(nums)-1).mSum
+}
+
+type Status struct {
+	lSum int	// 表示 [l,r] 内以 ll 为左端点的最大子段和
+	rSum int	// 表示 [l,r] 内以 rr 为右端点的最大子段和
+	mSum int	// 表示 [l,r] 内的最大子段和
+	iSum int	// 表示 [l,r] 的区间和
+}
+
+func get(nums []int, l, r int) Status {
+	if l == r {		// 只有一个元素
+		return Status{nums[l], nums[l], nums[l], nums[l]}
+	}
+
+	mid := (l + r) >> 1
+	lSub := get(nums, l, mid)
+	rSub := get(nums, mid+1, r)
+	return pushUp(lSub, rSub)
+}
+
+// 合并两个元素的
+func pushUp(l, r Status) Status {
+	iSum := l.iSum + r.iSum
+	lSum := max(l.lSum, l.iSum+r.lSum)
+	rSum := max(r.rSum, r.iSum + l.rSum)
+	mSum := max(max(l.mSum, r.mSum), l.rSum+r.lSum)
+	return Status{
+		lSum: lSum,
+		rSum: rSum,
+		mSum: mSum,
+		iSum: iSum,
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
 // 贪心算法
 // 如果当前元素的和大于零，则加上当前元素之后的和最大值
 // 如果当前元素的和小于零，则要丢弃当前元素的值
