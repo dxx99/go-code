@@ -41,7 +41,7 @@ func generateParenthesis(n int) []string {
 	var dfs func(lNum int, rNum int, path string)
 	dfs = func(lNum int, rNum int, path string) {
 		// exit条件
-		if 2*n == len(path) {
+		if lNum == 0 && rNum == 0 {
 			res = append(res, path)
 			return
 		}
