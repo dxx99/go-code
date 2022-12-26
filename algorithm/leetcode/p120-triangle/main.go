@@ -44,8 +44,54 @@ func main() {
 
 }
 
-// f[i][j] = min(f[i-1][j], f[i-1][j-1]) + c[i][j]
+// 递归 + 记忆 求解
 func minimumTotal(triangle [][]int) int {
+	dp := make([][]int, len(triangle))
+	for i := 0; i < len(triangle); i++ {
+		dp[i] = make([]int, len(triangle))
+	}
+
+	var dfs func(int, int) int
+	dfs = func(i int, j int) int {
+		if i == len(triangle) {
+			return 0
+		}
+		if dp[i][j] != 0 {
+			return dp[i][j]
+		}
+		dp[i][j] = min(dfs(i+1,j), dfs(i+1, j+1)) + triangle[i][j]
+		return dp[i][j]
+	}
+	return dfs(0, 0)
+}
+
+func minimumTotalV2(triangle [][]int) int {
+	dp := make([][]int, len(triangle))
+	for i := 0; i < len(triangle); i++ {
+		dp[i] = make([]int, len(triangle))
+	}
+
+	min := func(x, y int) int {
+		if x < y {
+			return x
+		}
+		return y
+	}
+
+	// 初始化
+	dp[len(triangle)-1] = triangle[len(triangle)-1]
+
+	// 从下往上推
+	for i := len(triangle)-2; i >= 0 ; i-- {
+		for j := 0; j < len(triangle[i]); j++ {
+			dp[i][j] = min(dp[i+1][j], dp[i+1][j+1]) + triangle[i][j]
+		}
+	}
+	return dp[0][0]
+}
+
+// f[i][j] = min(f[i-1][j], f[i-1][j-1]) + c[i][j]
+func minimumTotalV3(triangle [][]int) int {
 	n := len(triangle)
 	f := make([][]int, n)
 	for i := 0; i < n; i++ {
@@ -55,6 +101,7 @@ func minimumTotal(triangle [][]int) int {
 	f[0][0] = triangle[0][0]
 
 	for i := 1; i < n; i++ {
+		// 第一排的值，要特别注意处理
 		f[i][0] = f[i-1][0] + triangle[i][0]
 		for j := 1; j < i; j++ {
 
