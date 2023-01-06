@@ -1,6 +1,8 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // p860 柠檬水找零
 // 在柠檬水摊上，每一杯柠檬水的售价为 5 美元。顾客排队购买你的产品，（按账单 bills 支付的顺序）一次购买一杯。
@@ -53,31 +55,22 @@ func lemonadeChange(bills []int) bool {
 		if bills[i] == 5 {
 			fiveNum++
 		}else if bills[i] == 10 {
+			if fiveNum == 0 {
+				return false
+			}
+			fiveNum--
 			tenNum++
-			if fiveNum >= 1 {
+		}else if bills[i] == 20 {
+			if fiveNum > 0 && tenNum > 0 {
 				fiveNum--
+				tenNum--
+			} else if fiveNum >= 3 {
+				fiveNum -= 3
 			}else {
 				return false
 			}
-		}else if bills[i] == 20 {
-			if tenNum >= 1 {
-				tenNum--
-				if fiveNum >= 1 {
-					fiveNum--
-				}else {
-					return false
-				}
-			} else {
-				if fiveNum >= 3 {
-					fiveNum -= 3
-				} else {
-					return false
-				}
-			}
-		}else {
-			return false
+
 		}
 	}
-
 	return true
 }
